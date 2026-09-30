@@ -6,7 +6,7 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
     exit();
 }
 
-$dbPath = DIR . '/ATDbingo.sqlite';
+$dbPath = "/var/www/html/ATDbingo.sqlite";
 
 $totalTopup = 0.00;
 $activeTransfers = 0;
