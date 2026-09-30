@@ -1,4 +1,4 @@
-[9/30/2026 4:43 AM] Adis dish: <?php
+<?php
 session_start();
 
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
