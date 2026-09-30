@@ -1,17 +1,16 @@
 <?php
+header('Content-Type: application/json; charset=UTF-8');
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
-header("Content-Type: application/json; charset=UTF-8");
+header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
 
-// የዳታቤዝ መገኛ መንገድ (DIR በትክክል ሁለት ሁለት አንደርስኮር አለው)
-$dbPath = "/var/www/html/ATDbingo.sqlite";
+// በሰርቨሩ ውስጥ የሚገኘው ዳታቤዝ
+$dbPath = DIR . '/ATDbingo.sqlite';
 
 try {
-    $db = new PDO("sqlite:" . $dbPath);
+    $db = new PDO('sqlite:' . $dbPath);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // የባንክ ስታይል ዝውውር መቆጣጠሪያ ቴብል ማዘጋጀት
+    // የባንክ ዝውውር መቆጣጠሪያ ሰንጠረዥ (Transaction Ledger)
     $db->exec("CREATE TABLE IF NOT EXISTS transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         reference_id TEXT UNIQUE NOT NULL,
@@ -21,31 +20,28 @@ try {
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         claimed_at DATETIME
     )");
-} catch (Exception $e) {
-    echo json_encode(["status" => "error", "message" => "DB Error: " . $e->getMessage()]);
-    exit;
-}
 
-// 1. ገንዘቡ በኮምፒውተሩ መወሰዱን ማረጋገጫ ሲደርስ (POST)
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $ref = $_POST['reference_id'] ?? '';
-    $username = $_POST['username'] ?? '';
+    $username = trim($_POST['username'] ?? $_GET['username'] ?? '');
 
-    if (!empty($ref)) {
-        $stmt = $db->prepare("UPDATE transactions 
-                              SET status = 'CLAIMED', claimed_at = CURRENT_TIMESTAMP 
-                              WHERE reference_id = :ref AND status = 'PENDING'");
-        $stmt->execute([':ref' => $ref]);
-
-        echo json_encode(["status" => "success", "message" => "Transaction claimed successfully."]);
+    if (empty($username)) {
+        echo json_encode(['status' => 'idle', 'message' => 'Service Active']);
         exit;
     }
-}
 
-// 2. ኮምፒውተሩ አዲስ የተላከ ባላንስ ሲጠይቅ (GET)
-$username = $_GET['username'] ?? '';
+    // 1. ቢንጎው ገንዘቡን ወስዶ ማረጋገጫ ሲልክ (Confirm Claim)
+    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reference_id'])) {
+        $ref = trim($_POST['reference_id']);
+        
+        $stmt = $db->prepare("UPDATE transactions 
+                              SET status = 'CLAIMED', claimed_at = CURRENT_TIMESTAMP 
+                              WHERE reference_id = :ref AND username = :u AND status = 'PENDING'");
+        $stmt->execute([':ref' => $ref, ':u' => $username]);
 
-if (!empty($username)) {
+        echo json_encode(['status' => 'success', 'message' => 'Transfer finalized']);
+        exit;
+    }
+
+    // 2. ቢንጎው አዲስ ዝውውር መኖሩን ሲጠይቅ (Pending Topup Check)
     $stmt = $db->prepare("SELECT reference_id, amount FROM transactions 
                           WHERE username = :u AND status = 'PENDING' 
                           ORDER BY id ASC LIMIT 1");
@@ -54,20 +50,22 @@ if (!empty($username)) {
 
     if ($tx) {
         echo json_encode([
-            "status" => "success",
-            "has_topup" => true,
-            "reference_id" => $tx['reference_id'],
-            "amount" => (float)$tx['amount']
+            'status' => 'success',
+            'has_topup' => true,
+            'reference_id' => $tx['reference_id'],
+            'amount' => (float)$tx['amount'],
+            'new_topup' => (float)$tx['amount']
         ]);
     } else {
         echo json_encode([
-            "status" => "success",
-            "has_topup" => false,
-            "amount" => 0.00
+            'status' => 'success',
+            'has_topup' => false,
+            'amount' => 0.00,
+            'new_topup' => 0.00
         ]);
     }
-    exit;
-}
 
-echo json_encode(["status" => "error", "message" => "Invalid Request"]);
+} catch (Exception $e) {
+    echo json_encode(['status' => 'error', 'message' => 'Internal Service Error']);
+}
 exit;
