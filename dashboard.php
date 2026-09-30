@@ -1,7 +1,10 @@
+th { background: #f8fafc; color: #64748b; font-weight: 600; }
+        .badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; background: #dcfce7; color: #15803d; }
+    </style>
 </head>
 <body>
     <div class="sidebar">
-        <div class="brand"><i class="fa-solid fa-bolt"></i> ATD Control</div>
+        <div class="brand"><i class="fa-solid fa-gamepad"></i> ATD Control</div>
         <a href="dashboard.php" class="nav-link active"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
         <a href="generate_balance.php" class="nav-link"><i class="fa-solid fa-paper-plane"></i> Transfer Balance</a>
         <a href="logout.php" class="nav-link logout"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
@@ -15,7 +18,7 @@
             </div>
             <div class="metric-card">
                 <h4>Pending Transfers</h4>
-                <p><?= $activeTransfers ?></p>
+                <p><?= (int)$activeTransfers ?></p>
             </div>
         </div>
 
@@ -34,7 +37,7 @@
                 </thead>
                 <tbody>
                     <?php if (empty($recentRecords)): ?>
-                        <tr><td colspan="6" style="text-align: center; color: #94a3b8;">ምንም የተላለፈ መረጃ የለም።</td></tr>
+                        <tr><td colspan="6" style="text-align: center; color: #94a3b8; padding: 24px;">ምንም የተላለፈ መረጃ የለም።</td></tr>
                     <?php else: ?>
                         <?php foreach ($recentRecords as $r): ?>
                             <tr>
