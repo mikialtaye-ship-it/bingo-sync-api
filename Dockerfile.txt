@@ -1,20 +1,8 @@
 FROM php:8.2-apache
 
-# ለ SQLite እና PDO የሚያስፈልጉ ተጨማሪ ነገሮችን መጫን
-RUN apt-get update && apt-get install -y \
-    sqlite3 \
-    libsqlite3-dev \
-    && docker-php-ext-install pdo pdo_sqlite
-
-# የ Apache ዌብ ሰርቨር ኮንፊገሬሽን
-RUN a2enmod rewrite
-
-# የፕሮጀክት ፋይሎችን ወደ ሰርቨሩ ማስተላለፍ
 COPY . /var/www/html/
 
-# የዳታቤዝ ፋይሉ እንዲነበብና እንዲጻፍበት ፈቃድ (Permissions) መስጠት
-RUN chown -R www-data:www-data /var/www/html \
-    && chmod -R 775 /var/www/html
+RUN chown -R www-data:www-data /var/www/html
 
 EXPOSE 80
 
