@@ -1,51 +1,78 @@
 <?php
-header('Content-Type: application/json; charset=UTF-8');
 header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Headers: Content-Type");
+header("Content-Type: application/json; charset=UTF-8");
 
-$dbPath = __DIR__ . '/ATDbingo.sqlite';
+$dbPath = DIR . "/online_balance.sqlite";
 
 try {
-    $db = new PDO('sqlite:' . $dbPath);
+    $db = new PDO("sqlite:$dbPath");
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // ተጠቃሚው የላከውን መረጃ መቀበል
-    $username = trim($_POST['username'] ?? $_GET['username'] ?? '');
-    $clientBalance = isset($_POST['client_balance']) ? (float)$_POST['client_balance'] : null;
+    // የዝውውር ሰንጠረዥ (Transaction Ledger)
+    $db->exec("CREATE TABLE IF NOT EXISTS transactions (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        reference_id TEXT UNIQUE NOT NULL,
+        username TEXT NOT NULL,
+        amount REAL NOT NULL,
+        status TEXT DEFAULT 'PENDING', -- PENDING ወይም CLAIMED
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        claimed_at DATETIME
+    )");
+} catch (Exception $e) {
+    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    exit;
+}
 
-    if (empty($username)) {
-        echo json_encode(['success' => false, 'message' => 'Username required']);
+// 1. ገንዘቡ ወደ ተጠቃሚው መግባቱን ማረጋገጥና መቆለፍ (CLAIM)
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $ref = $_POST['reference_id'] ?? '';
+    $username = $_POST['username'] ?? '';
+
+    if (!empty($ref)) {
+        // ገቢ የተደረገውን ትራንዛክሽን ብቻ ፈልጎ ወደ CLAIMED መቀየር
+        $stmt = $db->prepare("UPDATE transactions 
+                              SET status = 'CLAIMED', claimed_at = CURRENT_TIMESTAMP 
+                              WHERE reference_id = :ref AND status = 'PENDING'");
+        $stmt->execute([':ref' => $ref]);
+
+        if ($stmt->rowCount() > 0) {
+            echo json_encode(["status" => "success", "message" => "Transaction locked successfully."]);
+        } else {
+            echo json_encode(["status" => "already_processed", "message" => "Transaction was already claimed."]);
+        }
         exit;
     }
+}
 
-    // 1. ተጠቃሚው ሎካል ያለውን ባላንስ ከላከ፣ ኦንላይን ዳታቤዙን በዛ ባላንስ አዘምን (last_updated ተወግዷል)
-    if ($clientBalance !== null) {
-        $update = $db->prepare("UPDATE users SET balance = :bal WHERE username = :u");
-        $update->execute([':bal' => $clientBalance, ':u' => $username]);
+// 2. ለተጠቃሚው ያልተወሰደ አዲስ ዝውውር መፈለግ (GET)
+$username = $_GET['username'] ?? '';
 
-        // በዳሽቦርዱ Recent Activity ላይ እንዲታይ መመዝገብ
-        $log = $db->prepare("INSERT INTO generated_licenses (username, alias_name, mode, action_details, topup_amount, created_at) 
-                             VALUES (:u, :alias, 'client_sync', 'Live Balance Reported', :bal, CURRENT_TIMESTAMP)");
-        $log->execute([
-            ':u' => $username,
-            ':alias' => $username,
-            ':bal' => $clientBalance
+if (!empty($username)) {
+    // ገና ያልተወሰደ የመጀመሪያውን ዝውውር ማውጣት
+    $stmt = $db->prepare("SELECT reference_id, amount FROM transactions 
+                          WHERE username = :u AND status = 'PENDING' 
+                          ORDER BY id ASC LIMIT 1");
+    $stmt->execute([':u' => $username]);
+    $tx = $stmt->fetch(PDO::FETCH_ASSOC);
+
+    if ($tx) {
+        echo json_encode([
+            "status" => "success",
+            "has_topup" => true,
+            "reference_id" => $tx['reference_id'],
+            "amount" => (float)$tx['amount']
+        ]);
+    } else {
+        echo json_encode([
+            "status" => "success",
+            "has_topup" => false,
+            "amount" => 0.00
         ]);
     }
-
-    // 2. በኦንላይኑ ዳታቤዝ ያለውን ወቅታዊ ባላንስ ለተጠቃሚው መልሶ መላክ
-    $stmt = $db->prepare("SELECT balance FROM users WHERE username = :u LIMIT 1");
-    $stmt->execute([':u' => $username]);
-    $userRow = $stmt->fetch(PDO::FETCH_ASSOC);
-
-    echo json_encode([
-        'success' => true,
-        'username' => $username,
-        'server_balance' => $userRow ? (float)$userRow['balance'] : 0.00,
-        'message' => 'Synced successfully'
-    ]);
-
-} catch (Exception $e) {
-    echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+    exit;
 }
+
+echo json_encode(["status" => "error", "message" => "Invalid Request"]);
 exit;
