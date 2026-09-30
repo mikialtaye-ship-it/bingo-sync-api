@@ -3,8 +3,8 @@ header('Content-Type: application/json; charset=UTF-8');
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
 
-// በሰርቨሩ ውስጥ የሚገኘው ዳታቤዝ
-$dbPath = DIR . '/ATDbingo.sqlite';
+// በሰርቨሩ ውስጥ የሚገኘው ትክክለኛ የዳታቤዝ መንገድ
+$dbPath = '/var/www/html/ATDbingo.sqlite';
 
 try {
     $db = new PDO('sqlite:' . $dbPath);
@@ -66,6 +66,6 @@ try {
     }
 
 } catch (Exception $e) {
-    echo json_encode(['status' => 'error', 'message' => 'Internal Service Error']);
+    echo json_encode(['status' => 'error', 'message' => 'DB Connection Error']);
 }
 exit;
