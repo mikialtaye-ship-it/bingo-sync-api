@@ -4,53 +4,48 @@ header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type");
 header("Content-Type: application/json; charset=UTF-8");
 
-$dbPath = DIR . "/online_balance.sqlite";
+// የዳታቤዝ መገኛ መንገድ (DIR በትክክል ሁለት ሁለት አንደርስኮር አለው)
+$dbPath = DIR . "/ATDbingo.sqlite";
 
 try {
-    $db = new PDO("sqlite:$dbPath");
+    $db = new PDO("sqlite:" . $dbPath);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // የዝውውር ሰንጠረዥ (Transaction Ledger)
+    // የባንክ ስታይል ዝውውር መቆጣጠሪያ ቴብል ማዘጋጀት
     $db->exec("CREATE TABLE IF NOT EXISTS transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         reference_id TEXT UNIQUE NOT NULL,
         username TEXT NOT NULL,
         amount REAL NOT NULL,
-        status TEXT DEFAULT 'PENDING', -- PENDING ወይም CLAIMED
+        status TEXT DEFAULT 'PENDING',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         claimed_at DATETIME
     )");
 } catch (Exception $e) {
-    echo json_encode(["status" => "error", "message" => $e->getMessage()]);
+    echo json_encode(["status" => "error", "message" => "DB Error: " . $e->getMessage()]);
     exit;
 }
 
-// 1. ገንዘቡ ወደ ተጠቃሚው መግባቱን ማረጋገጥና መቆለፍ (CLAIM)
+// 1. ገንዘቡ በኮምፒውተሩ መወሰዱን ማረጋገጫ ሲደርስ (POST)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $ref = $_POST['reference_id'] ?? '';
     $username = $_POST['username'] ?? '';
 
     if (!empty($ref)) {
-        // ገቢ የተደረገውን ትራንዛክሽን ብቻ ፈልጎ ወደ CLAIMED መቀየር
         $stmt = $db->prepare("UPDATE transactions 
                               SET status = 'CLAIMED', claimed_at = CURRENT_TIMESTAMP 
                               WHERE reference_id = :ref AND status = 'PENDING'");
         $stmt->execute([':ref' => $ref]);
 
-        if ($stmt->rowCount() > 0) {
-            echo json_encode(["status" => "success", "message" => "Transaction locked successfully."]);
-        } else {
-            echo json_encode(["status" => "already_processed", "message" => "Transaction was already claimed."]);
-        }
+        echo json_encode(["status" => "success", "message" => "Transaction claimed successfully."]);
         exit;
     }
 }
 
-// 2. ለተጠቃሚው ያልተወሰደ አዲስ ዝውውር መፈለግ (GET)
+// 2. ኮምፒውተሩ አዲስ የተላከ ባላንስ ሲጠይቅ (GET)
 $username = $_GET['username'] ?? '';
 
 if (!empty($username)) {
-    // ገና ያልተወሰደ የመጀመሪያውን ዝውውር ማውጣት
     $stmt = $db->prepare("SELECT reference_id, amount FROM transactions 
                           WHERE username = :u AND status = 'PENDING' 
                           ORDER BY id ASC LIMIT 1");
