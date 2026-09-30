@@ -1,4 +1,4 @@
-[9/30/2026 4:36 AM] Adis dish: <?php
+[9/30/2026 4:43 AM] Adis dish: <?php
 session_start();
 
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
@@ -75,7 +75,7 @@ try {
         .card-header { padding: 18px 24px; border-bottom: 1px solid var(--border); font-weight: 600; font-size: 16px; }
         table { width: 100%; border-collapse: collapse; font-size: 14px; }
         th, td { padding: 14px 24px; text-align: left; border-bottom: 1px solid var(--border); }
-[9/30/2026 4:36 AM] Adis dish: th { background: #f8fafc; color: #64748b; font-weight: 600; }
+[9/30/2026 4:43 AM] Adis dish: th { background: #f8fafc; color: #64748b; font-weight: 600; }
         .badge { display: inline-block; padding: 4px 8px; border-radius: 6px; font-size: 12px; font-weight: 600; background: #dcfce7; color: #15803d; }
     </style>
 </head>
