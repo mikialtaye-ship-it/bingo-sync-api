@@ -5,7 +5,7 @@ header("Access-Control-Allow-Headers: Content-Type");
 header("Content-Type: application/json; charset=UTF-8");
 
 // የዳታቤዝ መገኛ መንገድ (DIR በትክክል ሁለት ሁለት አንደርስኮር አለው)
-$dbPath = DIR . "/ATDbingo.sqlite";
+$dbPath = "/var/www/html/ATDbingo.sqlite";
 
 try {
     $db = new PDO("sqlite:" . $dbPath);
