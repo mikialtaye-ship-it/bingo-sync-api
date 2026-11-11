@@ -1,4 +1,4 @@
- <?php
+<?php
 @ini_set('display_errors', '0');
 if (session_status() === PHP_SESSION_NONE) {
     @session_start();
@@ -10,21 +10,20 @@ try {
     $db = new PDO('sqlite:' . $dbPath);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // የተጠቃሚዎች ላይሰንስ ሰንጠረዥ
     $db->exec("CREATE TABLE IF NOT EXISTS user_licenses (
         username TEXT PRIMARY KEY,
+        mac_address TEXT,
         status TEXT DEFAULT 'ACTIVE',
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
 
-    // ነባር ተጠቃሚዎችን በሙሉ ወደዚህ ሰንጠረዥ መሳብ
-    $db->exec("INSERT OR IGNORE INTO user_licenses (username, status)
-               SELECT DISTINCT username, 'ACTIVE' FROM transactions WHERE username != ''
-               UNION
-               SELECT DISTINCT alias_name, 'ACTIVE' FROM generated_licenses WHERE alias_name IS NOT NULL AND alias_name != ''");
+    // ከ bingo_centers የተመዘገቡ አዳዲስ ተጠቃሚዎችን በሙሉ በራስ-ሰር ወደዚህ መሳብ
+    $db->exec("INSERT OR IGNORE INTO user_licenses (username, mac_address, status, updated_at)
+               SELECT username, mac_address, 'ACTIVE', created_at FROM bingo_centers");
+
 } catch (Exception $e) {}
 
-// 1. ዴስክቶፕ አፑ ኦንላይን ቼክ ሲያደርግ (API Mode)
+// 1. ዴስክቶፕ አፑ ቼክ ሲያደርግ (API Check)
 if (isset($_GET['username']) || isset($_POST['username'])) {
     header('Content-Type: application/json; charset=UTF-8');
     $checkUser = trim($_POST['username'] ?? $_GET['username'] ?? '');
@@ -51,18 +50,18 @@ if (isset($_GET['username']) || isset($_POST['username'])) {
 $message = '';
 $statusClass = '';
 
-// 2. አዲስ ተጠቃሚ መመዝገብ
+// 2. ተጠቃሚን በእጅ መመዝገብ
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_user'])) {
     $newUser = trim($_POST['new_username'] ?? '');
     if (!empty($newUser)) {
         $addStmt = $db->prepare("INSERT OR REPLACE INTO user_licenses (username, status, updated_at) VALUES (:u, 'ACTIVE', CURRENT_TIMESTAMP)");
         $addStmt->execute([':u' => $newUser]);
-        $message = "ተጠቃሚ {$newUser} በተሳካ ሁኔታ ተመዝግቧል!";
+        $message = "ተጠቃሚ {$newUser} ተመዝግቧል!";
         $statusClass = 'success';
     }
 }
 
-// 3. ተጠቃሚን ማገድ (Cancel) ወይም እገዳ ማንሳት (Activate)
+// 3. ተጠቃሚን Cancel (ማገድ) ወይም Activate ማድረግ
 if (isset($_GET['action']) && isset($_GET['target'])) {
     $act = $_GET['action'];
     $target = trim($_GET['target']);
@@ -80,9 +79,10 @@ if (isset($_GET['action']) && isset($_GET['target'])) {
     }
 }
 
+// አዳዲሶቹ ተጠቃሚዎች ከላይ እንዲወጡ በቅርብ ሰዓት ቅደም ተከተል (DESC) ማውጣት
 $allUsers = [];
 try {
-    $allUsers = $db->query("SELECT * FROM user_licenses ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
+    $allUsers = $db->query("SELECT * FROM user_licenses ORDER BY updated_at DESC, username ASC")->fetchAll(PDO::FETCH_ASSOC);
 } catch (Exception $e) {}
 ?>
 <!DOCTYPE html>
@@ -96,14 +96,14 @@ try {
         :root { --primary: #2563eb; --sidebar-bg: #0f172a; --sidebar-hover: #1e293b; --bg-main: #f8fafc; --card-bg: #ffffff; --border: #e2e8f0; --text-dark: #0f172a; --text-light: #64748b; }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { display: flex; min-height: 100vh; background-color: var(--bg-main); color: var(--text-dark); margin: 0; }
-[11/10/2026 6:41 PM] Adis dish: .sidebar { width: 250px; background-color: var(--sidebar-bg); color: #94a3b8; display: flex; flex-direction: column; padding: 20px; flex-shrink: 0; }
+        .sidebar { width: 250px; background-color: var(--sidebar-bg); color: #94a3b8; display: flex; flex-direction: column; padding: 20px; flex-shrink: 0; }
         .brand { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 30px; display: flex; align-items: center; gap: 10px; }
         .nav-link { color: #94a3b8; text-decoration: none; padding: 12px 14px; border-radius: 8px; margin-bottom: 6px; display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500; }
         .nav-link:hover, .nav-link.active { background-color: var(--sidebar-hover); color: #fff; }
         .nav-link.active { background-color: var(--primary); }
         .nav-link.logout { margin-top: auto; color: #f87171; }
         .main { flex: 1; padding: 40px; display: flex; flex-direction: column; align-items: center; gap: 24px; overflow-y: auto; }
-        .card { width: 100%; max-width: 720px; background: var(--card-bg); padding: 28px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        .card { width: 100%; max-width: 760px; background: var(--card-bg); padding: 28px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
         h2 { font-size: 19px; font-weight: 700; margin-bottom: 18px; }
         .msg { padding: 12px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; }
         .msg.success { background: #dcfce7; color: #15803d; }
@@ -126,6 +126,7 @@ try {
     <div class="sidebar">
         <div class="brand"><i class="fa-solid fa-gamepad"></i> ATD Control</div>
         <a href="dashboard.php" class="nav-link"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+        <a href="generate_user.php" class="nav-link"><i class="fa-solid fa-user-plus"></i> New Center (User)</a>
         <a href="generate_balance.php" class="nav-link"><i class="fa-solid fa-paper-plane"></i> Transfer Balance</a>
         <a href="check_status.php" class="nav-link active"><i class="fa-solid fa-ban"></i> Checking Status</a>
         <a href="logout.php" class="nav-link logout"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
@@ -148,17 +149,19 @@ try {
                 <thead>
                     <tr>
                         <th>ተጠቃሚ ስም (Username)</th>
+                        <th>MAC Address</th>
                         <th>ሁኔታ (License Status)</th>
- <th>እርምጃ (Action)</th>
+                        <th>እርምጃ (Action)</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if (empty($allUsers)): ?>
-                        <tr><td colspan="3" style="text-align: center; color: #94a3b8; padding: 20px;">ምንም ተጠቃሚ አልተገኘም።</td></tr>
+                        <tr><td colspan="4" style="text-align: center; color: #94a3b8; padding: 20px;">ምንም ተጠቃሚ አልተገኘም።</td></tr>
                     <?php else: ?>
                         <?php foreach ($allUsers as $u): ?>
                             <tr>
                                 <td><strong><?= htmlspecialchars($u['username']) ?></strong></td>
+                                <td><code><?= htmlspecialchars($u['mac_address'] ?: '-') ?></code></td>
                                 <td>
                                     <?php if ($u['status'] === 'ACTIVE'): ?>
                                         <span class="badge badge-active">ACTIVE (ክፍት)</span>
@@ -168,7 +171,7 @@ try {
                                 </td>
                                 <td>
                                     <?php if ($u['status'] === 'ACTIVE'): ?>
-                                        <a href="check_status.php?action=cancel&target=<?= urlencode($u['username']) ?>" class="btn-act btn-cancel" onclick="return confirm('ተጠቃሚ <?= htmlspecialchars($u['username']) ?> ይታገድ?')"><i class="fa-solid fa-ban"></i> Cancel (አግድ)</a>
+                                        <a href="check_status.php?action=cancel&target=<?= urlencode($u['username']) ?>" class="btn-act btn-cancel" onclick="return confirm('ተጠቃሚ <?= htmlspecialchars($u['username']) ?> እንዳይሠራ Cancel ማድረግ ትፈልጋለህ?')"><i class="fa-solid fa-ban"></i> Cancel (አግድ)</a>
                                     <?php else: ?>
                                         <a href="check_status.php?action=activate&target=<?= urlencode($u['username']) ?>" class="btn-act btn-active"><i class="fa-solid fa-check"></i> እገዳ አንሳ</a>
                                     <?php endif; ?>
