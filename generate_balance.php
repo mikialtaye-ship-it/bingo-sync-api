@@ -6,13 +6,12 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
     exit();
 }
 
-$dbPath = DIR . '/ATDbingo.sqlite';
+$dbPath = '/var/www/html/ATDbingo.sqlite';
 
 try {
     $db = new PDO('sqlite:' . $dbPath);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // የትራንዛክሽን ሰንጠረዥ (shop_id አምድ ያለው)
     $db->exec("CREATE TABLE IF NOT EXISTS transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         reference_id TEXT UNIQUE NOT NULL,
@@ -24,7 +23,6 @@ try {
         claimed_at DATETIME
     )");
 
-    // የተገናኙ ሱቆች እና የላይሰንስ ቁጥጥር ሰንጠረዥ
     $db->exec("CREATE TABLE IF NOT EXISTS shops (
         shop_id TEXT PRIMARY KEY,
         username TEXT NOT NULL,
@@ -49,7 +47,7 @@ try {
 $message = '';
 $statusClass = '';
 
-// 1. የሱቅ ላይሰንስ ማገድ (BLOCK/CANCEL) ወይም መክፈት (UNBLOCK)
+// 1. የሱቅ ላይሰንስ ማገድ (BLOCK) ወይም መክፈት (UNBLOCK)
 if (isset($_GET['action']) && isset($_GET['shop_id'])) {
     $action = $_GET['action'];
     $sId = trim($_GET['shop_id']);
@@ -57,13 +55,13 @@ if (isset($_GET['action']) && isset($_GET['shop_id'])) {
     if ($action === 'block') {
         $stmt = $db->prepare("UPDATE shops SET status = 'BLOCKED' WHERE shop_id = :s");
         $stmt->execute([':s' => $sId]);
-        $message = "ሱቅ {$sId} በተሳካ ሁኔታ ታግዷል (CANCELLED)! ደንበኛው ጋር ሲስተሙ ይዘጋል።";
-        $statusClass = "success";
+        $message = "ሱቅ {$sId} በተሳካ ሁኔታ ታግዷል (CANCELLED)!";
+        $statusClass = 'success';
     } elseif ($action === 'unblock') {
         $stmt = $db->prepare("UPDATE shops SET status = 'ACTIVE' WHERE shop_id = :s");
         $stmt->execute([':s' => $sId]);
         $message = "ሱቅ {$sId} እገዳው ተነስቶለታል!";
-        $statusClass = "success";
+        $statusClass = 'success';
     }
 }
 
@@ -71,32 +69,33 @@ if (isset($_GET['action']) && isset($_GET['shop_id'])) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $targetUser = trim($_POST['topup_username'] ?? '');
     $shopId = trim($_POST['shop_id'] ?? '');
-    $amount = (float)($_POST['amount'] ?? 0);
-    $admin = $_SESSION['username'] ?? 'root';
+    $amount = isset($_POST['amount']) ? (float)$_POST['amount'] : 0.0;
+    $admin = isset($_SESSION['username']) ? $_SESSION['username'] : 'root';
 
     if (!empty($targetUser) && $amount > 0) {
         try {
-            $refId = 'TXN' . strtoupper(substr(md5(uniqid(mt_rand(), true)), 0, 8));
+            $refId = 'TXN' . strtoupper(substr(md5(uniqid((string)mt_rand(), true)), 0, 8));
 
             $stmt = $db->prepare("INSERT INTO transactions (reference_id, username, amount, shop_id, status) 
                                   VALUES (:ref, :u, :amt, :s, 'PENDING')");
             $stmt->execute([
                 ':ref' => $refId,
-                ':u' => $targetUser,
+                ':u'   => $targetUser,
                 ':amt' => $amount,
-                ':s' => !empty($shopId) ? $shopId : null
+                ':s'   => (!empty($shopId) ? $shopId : null)
             ]);
 
+            $logDetails = "Ref: " . $refId . " | Shop: " . (!empty($shopId) ? $shopId : 'All') . " (Online Transfer)";
             $log = $db->prepare("INSERT INTO generated_licenses (username, alias_name, mode, action_details, topup_amount, created_at) 
                                  VALUES (:admin, :target, 'topup', :details, :amt, CURRENT_TIMESTAMP)");
             $log->execute([
-                ':admin' => $admin,
-                ':target' => $targetUser,
-                ':details' => "Ref: $refId | Shop: " . (!empty($shopId) ? $shopId : 'All') . " (Online Transfer)",
-                ':amt' => $amount
+                ':admin'   => $admin,
+                ':target'  => $targetUser,
+                ':details' => $logDetails,
+                ':amt'     => $amount
             ]);
 
-            $message = "✅ ETB " . number_format($amount, 2) . " ወደ ተጠቃሚ $targetUser ተላልፏል! (Ref: $refId)";
+            $message = "✅ ETB " . number_format($amount, 2) . " ወደ ተጠቃሚ {$targetUser} ተላልፏል! (Ref: {$refId})";
             $statusClass = "success";
         } catch (Exception $e) {
             $message = "ስህተት፡ " . $e->getMessage();
@@ -107,15 +106,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $statusClass = "error";
     }
 }
-[11/10/2026 5:49 PM] Adis dish: // የተመዘገቡ ሱቆችን ማውጣት
-$shops = $db->query("SELECT * FROM shops ORDER BY last_sync DESC")->fetchAll(PDO::FETCH_ASSOC);
+[11/10/2026 5:56 PM] Adis dish: // የተመዘገቡ ሱቆች ዝርዝር
+$shops = [];
+try {
+    $shopQuery = $db->query("SELECT * FROM shops ORDER BY last_sync DESC");
+    if ($shopQuery) {
+        $shops = $shopQuery->fetchAll(PDO::FETCH_ASSOC);
+    }
+} catch (Exception $e) {
+    $shops = [];
+}
 ?>
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ATD Control | Transfer Balance & Shop Manager</title>
+    <title>ATD Control | Transfer Balance</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -203,7 +210,7 @@ $shops = $db->query("SELECT * FROM shops ORDER BY last_sync DESC")->fetchAll(PDO
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 30px;
+            gap: 25px;
             overflow-y: auto;
         }
 
@@ -211,38 +218,37 @@ $shops = $db->query("SELECT * FROM shops ORDER BY last_sync DESC")->fetchAll(PDO
             width: 100%;
             max-width: 580px;
             background: var(--card-bg);
-            padding: 32px;
+            padding: 30px;
             border-radius: 12px;
             border: 1px solid var(--border);
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
         }
 
         h2 {
-            font-size: 20px;
+            font-size: 19px;
             font-weight: 700;
-            margin-bottom: 24px;
+            margin-bottom: 20px;
             text-align: center;
         }
 
         label {
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
             color: var(--text-light);
             display: block;
-            margin-top: 16px;
+            margin-top: 14px;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
 
         input {
             width: 100%;
-            padding: 12px 14px;
-            margin-top: 8px;
+            padding: 11px 13px;
+            margin-top: 6px;
             border: 1px solid var(--border);
             border-radius: 8px;
-            font-size: 15px;
+            font-size: 14px;
             outline: none;
-            transition: border-color 0.2s;
         }
 
         input:focus {
@@ -251,16 +257,15 @@ $shops = $db->query("SELECT * FROM shops ORDER BY last_sync DESC")->fetchAll(PDO
 
         button {
             width: 100%;
-            padding: 14px;
-            margin-top: 24px;
-[11/10/2026 5:49 PM] Adis dish: background: var(--primary);
+[11/10/2026 5:56 PM] Adis dish: padding: 13px;
+            margin-top: 20px;
+            background: var(--primary);
             color: #ffffff;
             border: none;
             border-radius: 8px;
             font-size: 15px;
             font-weight: 700;
             cursor: pointer;
-            transition: background-color 0.2s;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -275,7 +280,7 @@ $shops = $db->query("SELECT * FROM shops ORDER BY last_sync DESC")->fetchAll(PDO
             padding: 12px 16px;
             border-radius: 8px;
             font-size: 14px;
-            margin-bottom: 18px;
+            margin-bottom: 16px;
         }
 
         .msg.success {
@@ -290,11 +295,10 @@ $shops = $db->query("SELECT * FROM shops ORDER BY last_sync DESC")->fetchAll(PDO
             border: 1px solid #fecaca;
         }
 
-        /* ሱቆች ቴብል ዲዛይን */
         .table-responsive {
             width: 100%;
             overflow-x: auto;
-            margin-top: 16px;
+            margin-top: 10px;
         }
 
         table {
@@ -304,7 +308,7 @@ $shops = $db->query("SELECT * FROM shops ORDER BY last_sync DESC")->fetchAll(PDO
         }
 
         th, td {
-            padding: 12px;
+            padding: 10px;
             text-align: left;
             border-bottom: 1px solid var(--border);
         }
@@ -316,7 +320,7 @@ $shops = $db->query("SELECT * FROM shops ORDER BY last_sync DESC")->fetchAll(PDO
         }
 
         .badge {
-            padding: 4px 8px;
+            padding: 3px 8px;
             border-radius: 6px;
             font-size: 11px;
             font-weight: 700;
@@ -333,12 +337,11 @@ $shops = $db->query("SELECT * FROM shops ORDER BY last_sync DESC")->fetchAll(PDO
         }
 
         .btn-act {
-            padding: 6px 12px;
+            padding: 5px 10px;
             border-radius: 6px;
             text-decoration: none;
-            font-size: 12px;
+            font-size: 11px;
             font-weight: 600;
-            display: inline-block;
         }
 
         .btn-block {
@@ -346,17 +349,9 @@ $shops = $db->query("SELECT * FROM shops ORDER BY last_sync DESC")->fetchAll(PDO
             color: #ffffff;
         }
 
-        .btn-block:hover {
-            background: #dc2626;
-        }
-
         .btn-unblock {
             background: #22c55e;
             color: #ffffff;
-        }
-
-        .btn-unblock:hover {
-            background: #16a34a;
         }
     </style>
 </head>
@@ -369,7 +364,6 @@ $shops = $db->query("SELECT * FROM shops ORDER BY last_sync DESC")->fetchAll(PDO
     </div>
 
     <div class="main">
-        <!-- 1. ባላንስ ማስተላለፊያ ፎርም -->
         <div class="card">
             <h2><i class="fa-solid fa-paper-plane"></i> Transfer Balance to Client</h2>
             <?php if (!empty($message)): ?>
@@ -380,7 +374,7 @@ $shops = $db->query("SELECT * FROM shops ORDER BY last_sync DESC")->fetchAll(PDO
                 <input type="text" name="topup_username" value="adis" placeholder="Username" required>
 
                 <label>የሱቅ መለያ (Shop ID) - አማራጭ</label>
-                <input type="text" name="shop_id" placeholder="ምሳሌ፡ SHOP-XXXXXXXX (ለተወሰነ ማሽን ብቻ ከሆነ)">
+                <input type="text" name="shop_id" placeholder="ምሳሌ፡ SHOP-XXXXXXXX">
                 
                 <label>የገንዘብ መጠን (Amount)</label>
                 <input type="number" name="amount" value="500" step="0.01" min="1" placeholder="Amount in ETB" required>
@@ -388,12 +382,12 @@ $shops = $db->query("SELECT * FROM shops ORDER BY last_sync DESC")->fetchAll(PDO
                 <button type="submit"><i class="fa-solid fa-paper-plane"></i> አስተላልፍ (Transfer)</button>
             </form>
         </div>
-[11/10/2026 5:49 PM] Adis dish: <!-- 2. የተገናኙ ሱቆች እና የላይሰንስ ቁጥጥር (Cancel/Block) -->
+
         <div class="card">
             <h2><i class="fa-solid fa-store"></i> የተገናኙ ሱቆች እና ላይሰንስ ቁጥጥር</h2>
             <?php if (empty($shops)): ?>
                 <p style="color: #64748b; font-size: 13px; text-align: center; margin-top: 10px;">እስካሁን የተገናኘ ሱቅ የለም። ደንበኛው ከዴስክቶፕ አፑ አንዴ ሲንክ ሲያደርግ በራሱ እዚህ ይመዘገባል።</p>
-            <?php else: ?>
+[11/10/2026 5:56 PM] Adis dish: <?php else: ?>
                 <div class="table-responsive">
                     <table>
                         <thead>
@@ -418,7 +412,7 @@ $shops = $db->query("SELECT * FROM shops ORDER BY last_sync DESC")->fetchAll(PDO
                                     </td>
                                     <td>
                                         <?php if ($s['status'] === 'ACTIVE'): ?>
-                                            <a href="generate_balance.php?action=block&shop_id=<?= urlencode($s['shop_id']) ?>" class="btn-act btn-block" onclick="return confirm('ይህንን ሱቅ ማገድ ይፈልጋሉ? አፑ ወዲያውኑ ይዘጋል።')">አግድ (Cancel)</a>
+                                            <a href="generate_balance.php?action=block&shop_id=<?= urlencode($s['shop_id']) ?>" class="btn-act btn-block" onclick="return confirm('ይህንን ሱቅ ማገድ ይፈልጋሉ?')">አግድ (Cancel)</a>
                                         <?php else: ?>
                                             <a href="generate_balance.php?action=unblock&shop_id=<?= urlencode($s['shop_id']) ?>" class="btn-act btn-unblock">እገዳ አንሳ</a>
                                         <?php endif; ?>
