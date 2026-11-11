@@ -106,7 +106,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 $shops = [];
 try {
     $shopQuery = $db->query("SELECT shop_id, username, status, last_sync FROM shops ORDER BY last_sync DESC");
-[11/10/2026 6:02 PM] Adis dish: if ($shopQuery) {
+if ($shopQuery) {
         $shops = $shopQuery->fetchAll(PDO::FETCH_ASSOC);
     }
 } catch (Exception $e) {
@@ -160,7 +160,7 @@ try {
         .badge-active { background: #dcfce7; color: #15803d; }
         .badge-blocked { background: #fee2e2; color: #b91c1c; }
         .btn-act { padding: 5px 10px; border-radius: 6px; text-decoration: none; font-size: 11px; font-weight: 600; }
-[11/10/2026 6:02 PM] Adis dish: .btn-block { background: #ef4444; color: #ffffff; }
+: .btn-block { background: #ef4444; color: #ffffff; }
         .btn-unblock { background: #22c55e; color: #ffffff; }
     </style>
 </head>
