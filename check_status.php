@@ -1,5 +1,9 @@
  <?php
-session_start();
+ob_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
 $dbPath = '/var/www/html/ATDbingo.sqlite';
 
 try {
@@ -9,21 +13,21 @@ try {
     // የተጠቃሚዎች ላይሰንስ መቆጣጠሪያ ሰንጠረዥ
     $db->exec("CREATE TABLE IF NOT EXISTS user_licenses (
         username TEXT PRIMARY KEY,
-        status TEXT DEFAULT 'ACTIVE', -- 'ACTIVE' ወይም 'CANCELED'
+        status TEXT DEFAULT 'ACTIVE',
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
 
-    // በሲስተሙ ውስጥ ያሉ ተጠቃሚዎችን በሙሉ (ከ generated_licenses እና transactions) በራስ-ሰር ወደ user_licenses ማስገባት
+    // በሲስተሙ ውስጥ ያሉትን ነባር ተጠቃሚዎች በሙሉ ወደ ላይሰንስ ሰንጠረዥ በራስ-ሰር መሳብ
     $db->exec("INSERT OR IGNORE INTO user_licenses (username, status)
                SELECT DISTINCT username, 'ACTIVE' FROM transactions WHERE username != ''
                UNION
                SELECT DISTINCT alias_name, 'ACTIVE' FROM generated_licenses WHERE alias_name IS NOT NULL AND alias_name != ''");
 
 } catch (Exception $e) {
-    // DB Error
+    // ዳታቤዝ ስህተት
 }
 
-// ሀ) ዴስክቶፕ አፑ ኦንላይን ቼክ ሲያደርግ (API Check)
+// 1. ዴስክቶፕ አፑ ኦንላይን ቼክ ሲያደርግ (API Check)
 if (isset($_GET['username']) || isset($_POST['username'])) {
     header('Content-Type: application/json; charset=UTF-8');
     $checkUser = trim($_POST['username'] ?? $_GET['username'] ?? '');
@@ -47,7 +51,7 @@ if (isset($_GET['username']) || isset($_POST['username'])) {
     exit;
 }
 
-// ለ) አድሚን በብሮውዘር ገብቶ ተጠቃሚዎችን ሲቆጣጠር
+// 2. አድሚን በብሮውዘር ገብቶ ተጠቃሚዎችን ሲቆጣጠር
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
     header("Location: index.php");
     exit();
@@ -56,7 +60,7 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
 $message = '';
 $statusClass = '';
 
-// አዲስ ተጠቃሚ በእጅ መመዝገብ
+// አዲስ ተጠቃሚ መመዝገብ
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_user'])) {
     $newUser = trim($_POST['new_username'] ?? '');
     if (!empty($newUser)) {
@@ -67,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_user'])) {
     }
 }
 
-// ተጠቃሚን Cancel (ማገድ) ወይም Unblock ማድረግ
+// ተጠቃሚን ማገድ (Cancel) ወይም እገዳ ማንሳት
 if (isset($_GET['action']) && isset($_GET['target'])) {
     $act = $_GET['action'];
     $target = trim($_GET['target']);
@@ -75,7 +79,7 @@ if (isset($_GET['action']) && isset($_GET['target'])) {
     if ($act === 'cancel') {
         $stmt = $db->prepare("UPDATE user_licenses SET status = 'CANCELED', updated_at = CURRENT_TIMESTAMP WHERE username = :u");
         $stmt->execute([':u' => $target]);
-        $message = "ተጠቃሚ {$target} ታግዷል (CANCELED)! አፑ ወዲያውኑ ይዘጋል።";
+        $message = "ተጠቃሚ {$target} ታግዷል (CANCELED)!";
         $statusClass = 'error';
     } elseif ($act === 'activate') {
         $stmt = $db->prepare("UPDATE user_licenses SET status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP WHERE username = :u");
@@ -97,7 +101,7 @@ $allUsers = $db->query("SELECT * FROM user_licenses ORDER BY username ASC")->fet
     <style>
         :root { --primary: #2563eb; --sidebar-bg: #0f172a; --sidebar-hover: #1e293b; --bg-main: #f8fafc; --card-bg: #ffffff; --border: #e2e8f0; --text-dark: #0f172a; --text-light: #64748b; }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-[11/10/2026 6:22 PM] Adis dish: body { display: flex; min-height: 100vh; background-color: var(--bg-main); color: var(--text-dark); margin: 0; }
+[11/10/2026 6:29 PM] Adis dish: body { display: flex; min-height: 100vh; background-color: var(--bg-main); color: var(--text-dark); margin: 0; }
         .sidebar { width: 250px; background-color: var(--sidebar-bg); color: #94a3b8; display: flex; flex-direction: column; padding: 20px; flex-shrink: 0; }
         .brand { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 30px; display: flex; align-items: center; gap: 10px; }
         .nav-link { color: #94a3b8; text-decoration: none; padding: 12px 14px; border-radius: 8px; margin-bottom: 6px; display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500; }
@@ -170,9 +174,9 @@ $allUsers = $db->query("SELECT * FROM user_licenses ORDER BY username ASC")->fet
                                 </td>
                                 <td>
                                     <?php if ($u['status'] === 'ACTIVE'): ?>
-                                        <a href="check_status.php?action=cancel&target=<?= urlencode($u['username']) ?>" class="btn-act btn-cancel" onclick="return confirm('እርግጠኛ ነህ ተጠቃሚ <?= htmlspecialchars($u['username']) ?> እንዳይሠራ Cancel/ማገድ ትፈልጋለህ?')"><i class="fa-solid fa-ban"></i> Cancel (አግድ)</a>
+                                        <a href="check_status.php?action=cancel&target=<?= urlencode($u['username']) ?>" class="btn-act btn-cancel" onclick="return confirm('እርግጠኛ ነህ ተጠቃሚ <?= htmlspecialchars($u['username']) ?> እንዳይሠራ Cancel ማድረግ ትፈልጋለህ?')"><i class="fa-solid fa-ban"></i> Cancel (አግድ)</a>
                                     <?php else: ?>
-                                        <a href="check_status.php?action=activate&target=<?= urlencode($u['username']) ?>" class="btn-act btn-active"><i class="fa-solid fa-check"></i> እገዳ አንሳ (Activate)</a>
+                                        <a href="check_status.php?action=activate&target=<?= urlencode($u['username']) ?>" class="btn-act btn-active"><i class="fa-solid fa-check"></i> እገዳ አንሳ</a>
                                     <?php endif; ?>
                                 </td>
                             </tr>
