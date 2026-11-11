@@ -1,5 +1,7 @@
- <?php
+<?php
+ob_start();
 session_start();
+
 if (!isset($_SESSION['user_id'])) {
     header('Location: index.php');
     exit;
@@ -11,7 +13,6 @@ try {
     $db = new PDO('sqlite:' . $dbPath);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // የተሟላ የመረጃ ቋት (Centers / Users with contact info)
     $db->exec("CREATE TABLE IF NOT EXISTS bingo_centers (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         center_name TEXT NOT NULL,
@@ -69,10 +70,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $region             = trim($_POST['region'] ?? '');
     $address            = trim($_POST['address'] ?? '');
     $notes              = trim($_POST['notes'] ?? '');
-    $initial_balance    = (float)($_POST['initial_balance'] ?? 0.0);
+    $initial_balance    = isset($_POST['initial_balance']) ? (float)$_POST['initial_balance'] : 0.0;
 
-    if (empty($center_name)  empty($username)  empty($password) || empty($mac_address)) {
-        $message = "እባክዎ ዋና ዋና መስኮችን (Full Name, Username, Password, MAC Address) በትክክል ይሙሉ!";
+    if ($center_name === '' || $username === '' || $password === '' || $mac_address === '') {
+        $message = "እባክዎ ዋና ዋና መስኮችን (Center Name, Username, Password, MAC Address) በትክክል ይሙሉ!";
         $message_type = "error";
     } else {
         try {
@@ -94,11 +95,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 ':bal'  => $initial_balance
             ]);
 
-            // ላይሰንስ መቆጣጠሪያ ላይ በራስ-ሰር መመዝገብ
             $db->prepare("INSERT OR REPLACE INTO user_licenses (username, status, updated_at) VALUES (:u, 'ACTIVE', CURRENT_TIMESTAMP)")->execute([':u' => $username]);
 
-            // .enc ፋይል ማመንጨትና ማውረድ
- $payload = json_encode([
+            $payload = json_encode([
                 'username'         => $username,
                 'password'         => $password,
                 'name'             => $center_name,
@@ -112,11 +111,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $raw = encryptRaw((string)$payload, $key);
             $base64 = base64_encode($raw);
 
-            // Log entry
+            $adminUser = $_SESSION['username'] ?? 'root';
             $db->prepare("INSERT INTO generated_licenses (username, alias_name, mode, action_details, mac_address) VALUES (:adm, :u, 'user', :det, :mac)")->execute([
-                ':adm' => $_SESSION['username'] ?? 'root',
+                ':adm' => $adminUser,
                 ':u'   => $username,
-                ':det' => "Center: $center_name | Region: $region",
+                ':det' => "Center: " . $center_name . " | Region: " . $region,
                 ':mac' => $mac_address
             ]);
 
@@ -168,7 +167,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             position: relative;
         }
 
-        /* Step Indicators */
         .stepper {
             display: flex;
             align-items: center;
@@ -209,7 +207,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
 
         .step-line.completed { background: #10b981; }
- /* Icon Badge */
+
         .icon-header {
             width: 52px;
             height: 52px;
@@ -226,7 +224,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         .header-title { font-size: 20px; font-weight: 700; text-align: center; margin-bottom: 6px; }
         .header-desc { font-size: 13px; color: var(--text-sub); text-align: center; margin-bottom: 22px; }
 
-        /* Form elements */
         .form-group { margin-bottom: 14px; }
         .form-row { display: flex; gap: 10px; }
         .form-row .form-group { flex: 1; }
@@ -256,7 +253,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         input:focus, textarea:focus { border-color: var(--primary); }
         input::placeholder, textarea::placeholder { color: #52668d; font-size: 13px; }
 
-        /* Buttons */
         .btn-row {
             display: flex;
             gap: 12px;
@@ -297,7 +293,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
         .btn-back:hover, .btn-cancel:hover { color: #fff; }
 
-        /* Review Details Box (Step 3) */
         .review-box {
             background: rgba(26, 37, 60, 0.6);
             border: 1px solid var(--border-color);
@@ -336,8 +331,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
 <div class="modal-card">
 
-    <!-- Stepper -->
- <div class="stepper">
+    <div class="stepper">
         <div class="step-circle active" id="dot-1">1</div>
         <div class="step-line" id="line-1"></div>
         <div class="step-circle" id="dot-2">2</div>
@@ -422,7 +416,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <label>Notes</label>
                 <textarea name="notes" id="notes" rows="2" placeholder="Any additional registration notes..."></textarea>
             </div>
- <div class="btn-row">
+
+            <div class="btn-row">
                 <button type="button" class="btn-back" onclick="goToStep(1)">Back</button>
                 <button type="button" class="btn-continue" onclick="populateReview(); goToStep(3)">Continue &rarr;</button>
             </div>
@@ -468,7 +463,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         const password = document.getElementById('password').value.trim();
         const mac = document.getElementById('mac_address').value.trim();
 
-        if (!centerName  !username  !password || !mac) {
+        if (!centerName || !username || !password || !mac) {
             alert('እባክዎ የመጀመሪያውን ደረጃ መረጃዎች (Center Name, Username, Password, MAC) በሙሉ ይሙሉ!');
             return;
         }
@@ -495,7 +490,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         document.getElementById('line-1').className = step > 1 ? 'step-line completed' : 'step-line';
         document.getElementById('line-2').className = step > 2 ? 'step-line completed' : 'step-line';
     }
- function populateReview() {
+
+    function populateReview() {
         document.getElementById('rv-center').innerText   = document.getElementById('center_name').value.trim() || '-';
         document.getElementById('rv-username').innerText = document.getElementById('username').value.trim() || '-';
         document.getElementById('rv-password').innerText = document.getElementById('password').value.trim() || '-';
