@@ -47,7 +47,6 @@ try {
 $message = '';
 $statusClass = '';
 
-// 1. የሱቅ ላይሰንስ ማገድ (BLOCK) ወይም መክፈት (UNBLOCK)
 if (isset($_GET['action']) && isset($_GET['shop_id'])) {
     $action = $_GET['action'];
     $sId = trim($_GET['shop_id']);
@@ -65,7 +64,6 @@ if (isset($_GET['action']) && isset($_GET['shop_id'])) {
     }
 }
 
-// 2. ባላንስ ማስተላለፍ (TRANSFER BALANCE)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $targetUser = trim($_POST['topup_username'] ?? '');
     $shopId = trim($_POST['shop_id'] ?? '');
@@ -74,10 +72,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!empty($targetUser) && $amount > 0) {
         try {
-            $refId = 'TXN' . strtoupper(substr(md5(uniqid((string)mt_rand(), true)), 0, 8));
+            $refId = 'TXN' . strtoupper(substr(md5(uniqid(strval(mt_rand()), true)), 0, 8));
 
-            $stmt = $db->prepare("INSERT INTO transactions (reference_id, username, amount, shop_id, status) 
-                                  VALUES (:ref, :u, :amt, :s, 'PENDING')");
+            $stmt = $db->prepare("INSERT INTO transactions (reference_id, username, amount, shop_id, status) VALUES (:ref, :u, :amt, :s, 'PENDING')");
             $stmt->execute([
                 ':ref' => $refId,
                 ':u'   => $targetUser,
@@ -86,8 +83,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
 
             $logDetails = "Ref: " . $refId . " | Shop: " . (!empty($shopId) ? $shopId : 'All') . " (Online Transfer)";
-            $log = $db->prepare("INSERT INTO generated_licenses (username, alias_name, mode, action_details, topup_amount, created_at) 
-                                 VALUES (:admin, :target, 'topup', :details, :amt, CURRENT_TIMESTAMP)");
+            $log = $db->prepare("INSERT INTO generated_licenses (username, alias_name, mode, action_details, topup_amount, created_at) VALUES (:admin, :target, 'topup', :details, :amt, CURRENT_TIMESTAMP)");
             $log->execute([
                 ':admin'   => $admin,
                 ':target'  => $targetUser,
@@ -106,11 +102,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $statusClass = "error";
     }
 }
-[11/10/2026 5:56 PM] Adis dish: // የተመዘገቡ ሱቆች ዝርዝር
+
 $shops = [];
 try {
-    $shopQuery = $db->query("SELECT * FROM shops ORDER BY last_sync DESC");
-    if ($shopQuery) {
+    $shopQuery = $db->query("SELECT shop_id, username, status, last_sync FROM shops ORDER BY last_sync DESC");
+[11/10/2026 6:02 PM] Adis dish: if ($shopQuery) {
         $shops = $shopQuery->fetchAll(PDO::FETCH_ASSOC);
     }
 } catch (Exception $e) {
@@ -136,223 +132,36 @@ try {
             --text-dark: #0f172a;
             --text-light: #64748b;
         }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        }
-
-        body {
-            display: flex;
-            min-height: 100vh;
-            background-color: var(--bg-main);
-            color: var(--text-dark);
-            margin: 0;
-        }
-
-        .sidebar {
-            width: 250px;
-            background-color: var(--sidebar-bg);
-            color: #94a3b8;
-            display: flex;
-            flex-direction: column;
-            padding: 20px;
-            flex-shrink: 0;
-        }
-
-        .brand {
-            font-size: 18px;
-            font-weight: 700;
-            color: #ffffff;
-            margin-bottom: 30px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .nav-link {
-            color: #94a3b8;
-            text-decoration: none;
-            padding: 12px 14px;
-            border-radius: 8px;
-            margin-bottom: 6px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 14px;
-            font-weight: 500;
-            transition: all 0.2s ease;
-        }
-
-        .nav-link:hover, .nav-link.active {
-            background-color: var(--sidebar-hover);
-            color: #ffffff;
-        }
-
-        .nav-link.active {
-            background-color: var(--primary);
-        }
-
-        .nav-link.logout {
-            margin-top: auto;
-            color: #f87171;
-        }
-
-        .nav-link.logout:hover {
-            background-color: rgba(239, 68, 68, 0.1);
-        }
-
-        .main {
-            flex: 1;
-            padding: 40px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 25px;
-            overflow-y: auto;
-        }
-
-        .card {
-            width: 100%;
-            max-width: 580px;
-            background: var(--card-bg);
-            padding: 30px;
-            border-radius: 12px;
-            border: 1px solid var(--border);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-        }
-
-        h2 {
-            font-size: 19px;
-            font-weight: 700;
-            margin-bottom: 20px;
-            text-align: center;
-        }
-
-        label {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-light);
-            display: block;
-            margin-top: 14px;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-
-        input {
-            width: 100%;
-            padding: 11px 13px;
-            margin-top: 6px;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            font-size: 14px;
-            outline: none;
-        }
-
-        input:focus {
-            border-color: var(--primary);
-        }
-
-        button {
-            width: 100%;
-[11/10/2026 5:56 PM] Adis dish: padding: 13px;
-            margin-top: 20px;
-            background: var(--primary);
-            color: #ffffff;
-            border: none;
-            border-radius: 8px;
-            font-size: 15px;
-            font-weight: 700;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-        }
-
-        button:hover {
-            background: var(--primary-hover);
-        }
-
-        .msg {
-            padding: 12px 16px;
-            border-radius: 8px;
-            font-size: 14px;
-            margin-bottom: 16px;
-        }
-
-        .msg.success {
-            background: #dcfce7;
-            color: #15803d;
-            border: 1px solid #bbf7d0;
-        }
-
-        .msg.error {
-            background: #fee2e2;
-            color: #b91c1c;
-            border: 1px solid #fecaca;
-        }
-
-        .table-responsive {
-            width: 100%;
-            overflow-x: auto;
-            margin-top: 10px;
-        }
-
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            font-size: 13px;
-        }
-
-        th, td {
-            padding: 10px;
-            text-align: left;
-            border-bottom: 1px solid var(--border);
-        }
-
-        th {
-            background: #f1f5f9;
-            color: var(--text-light);
-            font-weight: 600;
-        }
-
-        .badge {
-            padding: 3px 8px;
-            border-radius: 6px;
-            font-size: 11px;
-            font-weight: 700;
-        }
-
-        .badge-active {
-            background: #dcfce7;
-            color: #15803d;
-        }
-
-        .badge-blocked {
-            background: #fee2e2;
-            color: #b91c1c;
-        }
-
-        .btn-act {
-            padding: 5px 10px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-size: 11px;
-            font-weight: 600;
-        }
-
-        .btn-block {
-            background: #ef4444;
-            color: #ffffff;
-        }
-
-        .btn-unblock {
-            background: #22c55e;
-            color: #ffffff;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+        body { display: flex; min-height: 100vh; background-color: var(--bg-main); color: var(--text-dark); margin: 0; }
+        .sidebar { width: 250px; background-color: var(--sidebar-bg); color: #94a3b8; display: flex; flex-direction: column; padding: 20px; flex-shrink: 0; }
+        .brand { font-size: 18px; font-weight: 700; color: #ffffff; margin-bottom: 30px; display: flex; align-items: center; gap: 10px; }
+        .nav-link { color: #94a3b8; text-decoration: none; padding: 12px 14px; border-radius: 8px; margin-bottom: 6px; display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500; transition: all 0.2s ease; }
+        .nav-link:hover, .nav-link.active { background-color: var(--sidebar-hover); color: #ffffff; }
+        .nav-link.active { background-color: var(--primary); }
+        .nav-link.logout { margin-top: auto; color: #f87171; }
+        .nav-link.logout:hover { background-color: rgba(239, 68, 68, 0.1); }
+        .main { flex: 1; padding: 40px; display: flex; flex-direction: column; align-items: center; gap: 25px; overflow-y: auto; }
+        .card { width: 100%; max-width: 580px; background: var(--card-bg); padding: 30px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
+        h2 { font-size: 19px; font-weight: 700; margin-bottom: 20px; text-align: center; }
+        label { font-size: 12px; font-weight: 600; color: var(--text-light); display: block; margin-top: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+        input { width: 100%; padding: 11px 13px; margin-top: 6px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; }
+        input:focus { border-color: var(--primary); }
+        button { width: 100%; padding: 13px; margin-top: 20px; background: var(--primary); color: #ffffff; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        button:hover { background: var(--primary-hover); }
+        .msg { padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; }
+        .msg.success { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
+        .msg.error { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
+        .table-responsive { width: 100%; overflow-x: auto; margin-top: 10px; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border); }
+        th { background: #f1f5f9; color: var(--text-light); font-weight: 600; }
+        .badge { padding: 3px 8px; border-radius: 6px; font-size: 11px; font-weight: 700; }
+        .badge-active { background: #dcfce7; color: #15803d; }
+        .badge-blocked { background: #fee2e2; color: #b91c1c; }
+        .btn-act { padding: 5px 10px; border-radius: 6px; text-decoration: none; font-size: 11px; font-weight: 600; }
+[11/10/2026 6:02 PM] Adis dish: .btn-block { background: #ef4444; color: #ffffff; }
+        .btn-unblock { background: #22c55e; color: #ffffff; }
     </style>
 </head>
 <body>
@@ -387,7 +196,7 @@ try {
             <h2><i class="fa-solid fa-store"></i> የተገናኙ ሱቆች እና ላይሰንስ ቁጥጥር</h2>
             <?php if (empty($shops)): ?>
                 <p style="color: #64748b; font-size: 13px; text-align: center; margin-top: 10px;">እስካሁን የተገናኘ ሱቅ የለም። ደንበኛው ከዴስክቶፕ አፑ አንዴ ሲንክ ሲያደርግ በራሱ እዚህ ይመዘገባል።</p>
-[11/10/2026 5:56 PM] Adis dish: <?php else: ?>
+            <?php else: ?>
                 <div class="table-responsive">
                     <table>
                         <thead>
@@ -399,22 +208,22 @@ try {
                             </tr>
                         </thead>
                         <tbody>
-                            <?php foreach ($shops as $s): ?>
+                            <?php foreach ($shops as $row): ?>
                                 <tr>
-                                    <td><strong><?= htmlspecialchars($s['shop_id']) ?></strong></td>
-                                    <td><?= htmlspecialchars($s['username']) ?></td>
+                                    <td><strong><?= htmlspecialchars($row['shop_id']) ?></strong></td>
+                                    <td><?= htmlspecialchars($row['username']) ?></td>
                                     <td>
-                                        <?php if ($s['status'] === 'ACTIVE'): ?>
+                                        <?php if ($row['status'] === 'ACTIVE'): ?>
                                             <span class="badge badge-active">ACTIVE</span>
                                         <?php else: ?>
                                             <span class="badge badge-blocked">BLOCKED</span>
                                         <?php endif; ?>
                                     </td>
                                     <td>
-                                        <?php if ($s['status'] === 'ACTIVE'): ?>
-                                            <a href="generate_balance.php?action=block&shop_id=<?= urlencode($s['shop_id']) ?>" class="btn-act btn-block" onclick="return confirm('ይህንን ሱቅ ማገድ ይፈልጋሉ?')">አግድ (Cancel)</a>
+                                        <?php if ($row['status'] === 'ACTIVE'): ?>
+                                            <a href="generate_balance.php?action=block&shop_id=<?= urlencode($row['shop_id']) ?>" class="btn-act btn-block" onclick="return confirm('ይህንን ሱቅ ማገድ ይፈልጋሉ?')">አግድ (Cancel)</a>
                                         <?php else: ?>
-                                            <a href="generate_balance.php?action=unblock&shop_id=<?= urlencode($s['shop_id']) ?>" class="btn-act btn-unblock">እገዳ አንሳ</a>
+                                            <a href="generate_balance.php?action=unblock&shop_id=<?= urlencode($row['shop_id']) ?>" class="btn-act btn-unblock">እገዳ አንሳ</a>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
