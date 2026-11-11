@@ -1,4 +1,4 @@
-<?php
+ <?php
 session_start();
 if (!isset($_SESSION['user_id'])) {
     header('Location: index.php');
@@ -71,7 +71,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
     $notes              = trim($_POST['notes'] ?? '');
     $initial_balance    = (float)($_POST['initial_balance'] ?? 0.0);
 
-    if (empty($center_name) || empty($username) || empty($password) || empty($mac_address)) {
+    if (empty($center_name)  empty($username)  empty($password) || empty($mac_address)) {
         $message = "እባክዎ ዋና ዋና መስኮችን (Full Name, Username, Password, MAC Address) በትክክል ይሙሉ!";
         $message_type = "error";
     } else {
@@ -98,7 +98,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             $db->prepare("INSERT OR REPLACE INTO user_licenses (username, status, updated_at) VALUES (:u, 'ACTIVE', CURRENT_TIMESTAMP)")->execute([':u' => $username]);
 
             // .enc ፋይል ማመንጨትና ማውረድ
-            $payload = json_encode([
+ $payload = json_encode([
                 'username'         => $username,
                 'password'         => $password,
                 'name'             => $center_name,
@@ -209,8 +209,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         }
 
         .step-line.completed { background: #10b981; }
-
-        /* Icon Badge */
+ /* Icon Badge */
         .icon-header {
             width: 52px;
             height: 52px;
@@ -338,7 +337,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 <div class="modal-card">
 
     <!-- Stepper -->
-    <div class="stepper">
+ <div class="stepper">
         <div class="step-circle active" id="dot-1">1</div>
         <div class="step-line" id="line-1"></div>
         <div class="step-circle" id="dot-2">2</div>
@@ -361,27 +360,27 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             <div class="form-group">
                 <label>Full Name / Branch</label>
-                <input type="text" name="center_name" id="center_name" placeholder="e.g. Merkato Branch, Adis" value="Adis" required>
+                <input type="text" name="center_name" id="center_name" placeholder="e.g. Merkato Branch, Adis" value="" required>
             </div>
 
             <div class="form-row">
                 <div class="form-group">
                     <label>Username</label>
-                    <input type="text" name="username" id="username" placeholder="merkato01" value="adis" required>
+                    <input type="text" name="username" id="username" placeholder="e.g. adis, merkato01" value="" required>
                 </div>
                 <div class="form-group">
                     <label>Password</label>
-                    <input type="text" name="password" id="password" placeholder="min 6 chars" value="adis123" required>
+                    <input type="text" name="password" id="password" placeholder="min 6 chars" value="" required>
                 </div>
             </div>
 
             <div class="form-group">
                 <label>MAC Address</label>
-                <input type="text" name="mac_address" id="mac_address" placeholder="00:23:18:6D:06:8C" value="00:23:18:6D:06:8C" required>
+                <input type="text" name="mac_address" id="mac_address" placeholder="00:23:18:6D:06:8C" value="" required>
             </div>
 
             <div class="btn-row">
-                <button type="button" class="btn-continue" onclick="goToStep(2)">Continue &rarr;</button>
+                <button type="button" class="btn-continue" onclick="validateStep1()">Continue &rarr;</button>
                 <a href="dashboard.php" class="btn-cancel">Cancel</a>
             </div>
         </div>
@@ -394,28 +393,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 
             <div class="form-group">
                 <label>Owner Name</label>
-                <input type="text" name="owner_name" id="owner_name" placeholder="e.g. Ahmed Hassan" value="Adis">
+                <input type="text" name="owner_name" id="owner_name" placeholder="e.g. Ahmed Hassan" value="">
             </div>
 
             <div class="form-row">
                 <div class="form-group">
                     <label>Phone</label>
-                    <input type="text" name="phone" id="phone" placeholder="+251 9XX XXX XXX" value="962025699">
+                    <input type="text" name="phone" id="phone" placeholder="+251 9XX XXX XXX" value="">
                 </div>
                 <div class="form-group">
                     <label>Additional Contact</label>
-                    <input type="text" name="additional_contact" id="additional_contact" placeholder="Alt phone, telegram" value="09620256">
+                    <input type="text" name="additional_contact" id="additional_contact" placeholder="Alt phone, telegram" value="">
                 </div>
             </div>
 
             <div class="form-row">
                 <div class="form-group">
                     <label>Region / City</label>
-                    <input type="text" name="region" id="region" placeholder="e.g. Addis Ababa" value="Oromiya">
+                    <input type="text" name="region" id="region" placeholder="e.g. Addis Ababa, Oromiya" value="">
                 </div>
                 <div class="form-group">
                     <label>Address</label>
-                    <input type="text" name="address" id="address" placeholder="Street, area..." value="Arsi sire">
+                    <input type="text" name="address" id="address" placeholder="Street, area..." value="">
                 </div>
             </div>
 
@@ -423,8 +422,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                 <label>Notes</label>
                 <textarea name="notes" id="notes" rows="2" placeholder="Any additional registration notes..."></textarea>
             </div>
-
-            <div class="btn-row">
+ <div class="btn-row">
                 <button type="button" class="btn-back" onclick="goToStep(1)">Back</button>
                 <button type="button" class="btn-continue" onclick="populateReview(); goToStep(3)">Continue &rarr;</button>
             </div>
@@ -437,15 +435,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
             <div class="header-desc">Confirm the center details before creating</div>
 
             <div class="review-box">
-                <div class="review-item"><span class="review-label">Center Name</span><span class="review-value" id="rv-center">Adis</span></div>
-                <div class="review-item"><span class="review-label">Username</span><span class="review-value" id="rv-username">adis</span></div>
-                <div class="review-item"><span class="review-label">Password</span><span class="review-value" id="rv-password">adis123</span></div>
-                <div class="review-item"><span class="review-label">MAC Address</span><span class="review-value" id="rv-mac">00:23:18:6D:06:8C</span></div>
-                <div class="review-item"><span class="review-label">Owner</span><span class="review-value" id="rv-owner">Adis</span></div>
-                <div class="review-item"><span class="review-label">Phone</span><span class="review-value" id="rv-phone">962025699</span></div>
-                <div class="review-item"><span class="review-label">Additional Contact</span><span class="review-value" id="rv-alt">09620256</span></div>
-                <div class="review-item"><span class="review-label">Region</span><span class="review-value" id="rv-region">Oromiya</span></div>
-                <div class="review-item"><span class="review-label">Address</span><span class="review-value" id="rv-address">Arsi sire</span></div>
+                <div class="review-item"><span class="review-label">Center Name</span><span class="review-value" id="rv-center">-</span></div>
+                <div class="review-item"><span class="review-label">Username</span><span class="review-value" id="rv-username">-</span></div>
+                <div class="review-item"><span class="review-label">Password</span><span class="review-value" id="rv-password">-</span></div>
+                <div class="review-item"><span class="review-label">MAC Address</span><span class="review-value" id="rv-mac">-</span></div>
+                <div class="review-item"><span class="review-label">Owner</span><span class="review-value" id="rv-owner">-</span></div>
+                <div class="review-item"><span class="review-label">Phone</span><span class="review-value" id="rv-phone">-</span></div>
+                <div class="review-item"><span class="review-label">Additional Contact</span><span class="review-value" id="rv-alt">-</span></div>
+                <div class="review-item"><span class="review-label">Region</span><span class="review-value" id="rv-region">-</span></div>
+                <div class="review-item"><span class="review-label">Address</span><span class="review-value" id="rv-address">-</span></div>
                 <div class="review-divider"></div>
                 <div class="review-item">
                     <span class="review-label">Initial Balance</span>
@@ -464,11 +462,23 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 </div>
 
 <script>
+    function validateStep1() {
+        const centerName = document.getElementById('center_name').value.trim();
+        const username = document.getElementById('username').value.trim();
+        const password = document.getElementById('password').value.trim();
+        const mac = document.getElementById('mac_address').value.trim();
+
+        if (!centerName  !username  !password || !mac) {
+            alert('እባክዎ የመጀመሪያውን ደረጃ መረጃዎች (Center Name, Username, Password, MAC) በሙሉ ይሙሉ!');
+            return;
+        }
+        goToStep(2);
+    }
+
     function goToStep(step) {
         document.querySelectorAll('.step-content').forEach(el => el.style.display = 'none');
         document.getElementById('step-' + step).style.display = 'block';
 
-        // Stepper state
         for (let i = 1; i <= 3; i++) {
             let dot = document.getElementById('dot-' + i);
             dot.className = 'step-circle';
@@ -485,17 +495,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
         document.getElementById('line-1').className = step > 1 ? 'step-line completed' : 'step-line';
         document.getElementById('line-2').className = step > 2 ? 'step-line completed' : 'step-line';
     }
-
-    function populateReview() {
-        document.getElementById('rv-center').innerText   = document.getElementById('center_name').value || '-';
-        document.getElementById('rv-username').innerText = document.getElementById('username').value || '-';
-        document.getElementById('rv-password').innerText = document.getElementById('password').value || '-';
-        document.getElementById('rv-mac').innerText      = document.getElementById('mac_address').value || '-';
-        document.getElementById('rv-owner').innerText    = document.getElementById('owner_name').value || '-';
-        document.getElementById('rv-phone').innerText    = document.getElementById('phone').value || '-';
-        document.getElementById('rv-alt').innerText      = document.getElementById('additional_contact').value || '-';
-        document.getElementById('rv-region').innerText   = document.getElementById('region').value || '-';
-        document.getElementById('rv-address').innerText  = document.getElementById('address').value || '-';
+ function populateReview() {
+        document.getElementById('rv-center').innerText   = document.getElementById('center_name').value.trim() || '-';
+        document.getElementById('rv-username').innerText = document.getElementById('username').value.trim() || '-';
+        document.getElementById('rv-password').innerText = document.getElementById('password').value.trim() || '-';
+        document.getElementById('rv-mac').innerText      = document.getElementById('mac_address').value.trim() || '-';
+        document.getElementById('rv-owner').innerText    = document.getElementById('owner_name').value.trim() || '-';
+        document.getElementById('rv-phone').innerText    = document.getElementById('phone').value.trim() || '-';
+        document.getElementById('rv-alt').innerText      = document.getElementById('additional_contact').value.trim() || '-';
+        document.getElementById('rv-region').innerText   = document.getElementById('region').value.trim() || '-';
+        document.getElementById('rv-address').innerText  = document.getElementById('address').value.trim() || '-';
     }
 </script>
 
