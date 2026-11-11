@@ -1,16 +1,16 @@
-<?php
+ <?php
+@ini_set('display_errors', '0');
 header('Content-Type: application/json; charset=UTF-8');
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
 
-// በሰርቨሩ ውስጥ የሚገኘው ትክክለኛ የዳታቤዝ መንገድ
 $dbPath = '/var/www/html/ATDbingo.sqlite';
 
 try {
     $db = new PDO('sqlite:' . $dbPath);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // 1. የባንክ ዝውውር መቆጣጠሪያ ሰንጠረዥ (shop_id አምድ ተጨምሮበታል)
+    // 1. Transactions ሰንጠረዥ
     $db->exec("CREATE TABLE IF NOT EXISTS transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         reference_id TEXT UNIQUE NOT NULL,
@@ -22,12 +22,24 @@ try {
         claimed_at DATETIME
     )");
 
-    // 2. የሱቆች እና የላይሰንስ ሁኔታ መቆጣጠሪያ ሰንጠረዥ
+    // የቆየ ዳታቤዝ ከሆነ shop_id አምድ ካልነበረው በራስ-ሰር መጨመር
+    try {
+        $db->exec("ALTER TABLE transactions ADD COLUMN shop_id TEXT");
+    } catch (Exception $e) {}
+
+    // 2. የሱቆች ሰንጠረዥ
     $db->exec("CREATE TABLE IF NOT EXISTS shops (
         shop_id TEXT PRIMARY KEY,
         username TEXT NOT NULL,
-        status TEXT DEFAULT 'ACTIVE', -- 'ACTIVE', 'BLOCKED', ወይም 'CANCELLED'
+        status TEXT DEFAULT 'ACTIVE',
         last_sync DATETIME DEFAULT CURRENT_TIMESTAMP
+    )");
+
+    // 3. የተጠቃሚዎች ላይሰንስ ሰንጠረዥ (Cancellation)
+    $db->exec("CREATE TABLE IF NOT EXISTS user_licenses (
+        username TEXT PRIMARY KEY,
+        status TEXT DEFAULT 'ACTIVE',
+        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
 
     $username = trim($_POST['username'] ?? $_GET['username'] ?? '');
@@ -38,58 +50,61 @@ try {
         exit;
     }
 
-    // 3. Shop ID ካለ ሁኔታውን መፈተሽ እና መመዝገብ
-    if (!empty($shopId)) {
-        $shopCheck = $db->prepare("SELECT status FROM shops WHERE shop_id = :s LIMIT 1");
-        $shopCheck->execute([':s' => $shopId]);
-        $shop = $shopCheck->fetch(PDO::FETCH_ASSOC);
+    // 4. የተጠቃሚው ወይም የሱቁ እገዳ (Blocked/Cancelled Check)
+    if (!empty($username)) {
+        $uCheck = $db->prepare("SELECT status FROM user_licenses WHERE LOWER(username) = LOWER(:u) LIMIT 1");
+        $uCheck->execute([':u' => $username]);
+        $uStatus = $uCheck->fetchColumn();
 
-        if (!$shop) {
-            // አዲስ ሱቅ ከሆነ በ ACTIVE ሁኔታ መመዝገብ
-            $addShop = $db->prepare("INSERT INTO shops (shop_id, username, status, last_sync) VALUES (:s, :u, 'ACTIVE', CURRENT_TIMESTAMP)");
-            $addShop->execute([':s' => $shopId, ':u' => $username]);
+        if ($uStatus === 'CANCELED' || $uStatus === 'BLOCKED') {
+            echo json_encode([
+                'status' => 'blocked',
+                'is_blocked' => true,
+                'has_topup' => false,
+                'message' => 'ይህ አካውንት ከአስተዳዳሪው ታግዷል!'
+            ]);
+            exit;
+        }
+    }
+
+    if (!empty($shopId)) {
+        $sCheck = $db->prepare("SELECT status FROM shops WHERE shop_id = :s LIMIT 1");
+        $sCheck->execute([':s' => $shopId]);
+        $sRow = $sCheck->fetch(PDO::FETCH_ASSOC);
+
+        if (!$sRow) {
+            $ins = $db->prepare("INSERT INTO shops (shop_id, username, status, last_sync) VALUES (:s, :u, 'ACTIVE', CURRENT_TIMESTAMP)");
+            $ins->execute([':s' => $shopId, ':u' => $username]);
         } else {
-            // ሱቁ ከተሰረዘ ወይም ከታገደ ወዲያውኑ ማገድ
-            if ($shop['status'] === 'BLOCKED' || $shop['status'] === 'CANCELLED') {
+            if ($sRow['status'] === 'BLOCKED' || $sRow['status'] === 'CANCELLED') {
                 echo json_encode([
                     'status' => 'blocked',
                     'is_blocked' => true,
                     'has_topup' => false,
-                    'message' => 'ይህ ሲስተም/ላይሰንስ ከአድሚን ታግዷል! እባክዎ ያነጋግሩ።'
+                    'message' => 'ይህ ሱቅ ከአስተዳዳሪው ታግዷል!'
                 ]);
                 exit;
             }
-            // ሱቁ ክፍት ከሆነ የመጨረሻ ግንኙነት ሰዓቱን ማደስ
-            $updateSync = $db->prepare("UPDATE shops SET last_sync = CURRENT_TIMESTAMP WHERE shop_id = :s");
-            $updateSync->execute([':s' => $shopId]);
+            $upd = $db->prepare("UPDATE shops SET last_sync = CURRENT_TIMESTAMP, username = :u WHERE shop_id = :s");
+            $upd->execute([':u' => $username, ':s' => $shopId]);
         }
     }
 
-    // 4. ቢንጎው ገንዘቡን ወስዶ ማረጋገጫ ሲልክ (Confirm Claim)
+    // 5. ቢንጎው ብሩን ወስዶ ሲያረጋግጥ (Confirm Claim)
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reference_id'])) {
         $ref = trim($_POST['reference_id']);
-        
-        $stmt = $db->prepare("UPDATE transactions 
-                              SET status = 'CLAIMED', claimed_at = CURRENT_TIMESTAMP 
-                              WHERE reference_id = :ref AND username = :u AND status = 'PENDING'");
+        $stmt = $db->prepare("UPDATE transactions SET status = 'CLAIMED', claimed_at = CURRENT_TIMESTAMP WHERE reference_id = :ref AND LOWER(username) = LOWER(:u) AND status = 'PENDING'");
         $stmt->execute([':ref' => $ref, ':u' => $username]);
 
         echo json_encode(['status' => 'success', 'message' => 'Transfer finalized']);
         exit;
     }
 
-    // 5. ቢንጎው አዲስ ዝውውር መኖሩን ሲጠይቅ (Pending Topup Check)
-    $sql = "SELECT reference_id, amount FROM transactions WHERE username = :u AND status = 'PENDING' ";
-    $params = [':u' => $username];
-
-    if (!empty($shopId)) {
-        $sql .= "AND (shop_id = :s OR shop_id IS NULL OR shop_id = '') ";
-        $params[':s'] = $shopId;
-    }
-    $sql .= "ORDER BY id ASC LIMIT 1";
-
-    $stmt = $db->prepare($sql);
-    $stmt->execute($params);
+    // 6. ለተጠቃሚው አዲስ የተላከ ብር መኖሩን ቼክ ማድረግ (Topup Check)
+ $stmt = $db->prepare("SELECT reference_id, amount FROM transactions 
+                          WHERE LOWER(username) = LOWER(:u) AND status = 'PENDING' 
+                          ORDER BY id ASC LIMIT 1");
+    $stmt->execute([':u' => $username]);
     $tx = $stmt->fetch(PDO::FETCH_ASSOC);
 
     if ($tx) {
@@ -98,7 +113,7 @@ try {
             'is_blocked' => false,
             'has_topup' => true,
             'reference_id' => $tx['reference_id'],
-[11/10/2026 5:02 PM] Adis dish: 'amount' => (float)$tx['amount'],
+            'amount' => (float)$tx['amount'],
             'new_topup' => (float)$tx['amount']
         ]);
     } else {
@@ -112,6 +127,11 @@ try {
     }
 
 } catch (Exception $e) {
-    echo json_encode(['status' => 'error', 'message' => 'DB Connection Error: ' . $e->getMessage()]);
+    echo json_encode([
+        'status' => 'error',
+        'is_blocked' => false,
+        'has_topup' => false,
+        'message' => $e->getMessage()
+    ]);
 }
 exit;
