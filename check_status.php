@@ -1,6 +1,8 @@
  <?php
-ob_start();
-session_start();
+@ini_set('display_errors', '0');
+if (session_status() === PHP_SESSION_NONE) {
+    @session_start();
+}
 
 $dbPath = '/var/www/html/ATDbingo.sqlite';
 
@@ -8,19 +10,21 @@ try {
     $db = new PDO('sqlite:' . $dbPath);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
+    // የተጠቃሚዎች ላይሰንስ ሰንጠረዥ
     $db->exec("CREATE TABLE IF NOT EXISTS user_licenses (
         username TEXT PRIMARY KEY,
         status TEXT DEFAULT 'ACTIVE',
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
 
+    // ነባር ተጠቃሚዎችን በሙሉ ወደዚህ ሰንጠረዥ መሳብ
     $db->exec("INSERT OR IGNORE INTO user_licenses (username, status)
                SELECT DISTINCT username, 'ACTIVE' FROM transactions WHERE username != ''
                UNION
                SELECT DISTINCT alias_name, 'ACTIVE' FROM generated_licenses WHERE alias_name IS NOT NULL AND alias_name != ''");
 } catch (Exception $e) {}
 
-// 1. ዴስክቶፕ አፑ ኦንላይን ቼክ ሲያደርግ (API Check)
+// 1. ዴስክቶፕ አፑ ኦንላይን ቼክ ሲያደርግ (API Mode)
 if (isset($_GET['username']) || isset($_POST['username'])) {
     header('Content-Type: application/json; charset=UTF-8');
     $checkUser = trim($_POST['username'] ?? $_GET['username'] ?? '');
@@ -44,16 +48,10 @@ if (isset($_GET['username']) || isset($_POST['username'])) {
     exit;
 }
 
-// 2. አድሚን ገብቶ መቆጣጠር ሲፈልግ (ሴሽን ከሌለው ወደ ሎግኢን መላክ)
-if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
-    echo "<script>window.location.href='index.php';</script>";
-    exit();
-}
-
 $message = '';
 $statusClass = '';
 
-// አዲስ ተጠቃሚ መመዝገብ
+// 2. አዲስ ተጠቃሚ መመዝገብ
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_user'])) {
     $newUser = trim($_POST['new_username'] ?? '');
     if (!empty($newUser)) {
@@ -64,7 +62,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_user'])) {
     }
 }
 
-// ተጠቃሚን ማገድ (Cancel) ወይም እገዳ ማንሳት
+// 3. ተጠቃሚን ማገድ (Cancel) ወይም እገዳ ማንሳት (Activate)
 if (isset($_GET['action']) && isset($_GET['target'])) {
     $act = $_GET['action'];
     $target = trim($_GET['target']);
@@ -82,7 +80,10 @@ if (isset($_GET['action']) && isset($_GET['target'])) {
     }
 }
 
-$allUsers = $db->query("SELECT * FROM user_licenses ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
+$allUsers = [];
+try {
+    $allUsers = $db->query("SELECT * FROM user_licenses ORDER BY username ASC")->fetchAll(PDO::FETCH_ASSOC);
+} catch (Exception $e) {}
 ?>
 <!DOCTYPE html>
 <html lang="en">
@@ -95,7 +96,7 @@ $allUsers = $db->query("SELECT * FROM user_licenses ORDER BY username ASC")->fet
         :root { --primary: #2563eb; --sidebar-bg: #0f172a; --sidebar-hover: #1e293b; --bg-main: #f8fafc; --card-bg: #ffffff; --border: #e2e8f0; --text-dark: #0f172a; --text-light: #64748b; }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
         body { display: flex; min-height: 100vh; background-color: var(--bg-main); color: var(--text-dark); margin: 0; }
-[11/10/2026 6:34 PM] Adis dish: .sidebar { width: 250px; background-color: var(--sidebar-bg); color: #94a3b8; display: flex; flex-direction: column; padding: 20px; flex-shrink: 0; }
+[11/10/2026 6:41 PM] Adis dish: .sidebar { width: 250px; background-color: var(--sidebar-bg); color: #94a3b8; display: flex; flex-direction: column; padding: 20px; flex-shrink: 0; }
         .brand { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 30px; display: flex; align-items: center; gap: 10px; }
         .nav-link { color: #94a3b8; text-decoration: none; padding: 12px 14px; border-radius: 8px; margin-bottom: 6px; display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500; }
         .nav-link:hover, .nav-link.active { background-color: var(--sidebar-hover); color: #fff; }
@@ -167,7 +168,7 @@ $allUsers = $db->query("SELECT * FROM user_licenses ORDER BY username ASC")->fet
                                 </td>
                                 <td>
                                     <?php if ($u['status'] === 'ACTIVE'): ?>
-                                        <a href="check_status.php?action=cancel&target=<?= urlencode($u['username']) ?>" class="btn-act btn-cancel" onclick="return confirm('እርግጠኛ ነህ ተጠቃሚ <?= htmlspecialchars($u['username']) ?> እንዳይሠራ Cancel ማድረግ ትፈልጋለህ?')"><i class="fa-solid fa-ban"></i> Cancel (አግድ)</a>
+                                        <a href="check_status.php?action=cancel&target=<?= urlencode($u['username']) ?>" class="btn-act btn-cancel" onclick="return confirm('ተጠቃሚ <?= htmlspecialchars($u['username']) ?> ይታገድ?')"><i class="fa-solid fa-ban"></i> Cancel (አግድ)</a>
                                     <?php else: ?>
                                         <a href="check_status.php?action=activate&target=<?= urlencode($u['username']) ?>" class="btn-act btn-active"><i class="fa-solid fa-check"></i> እገዳ አንሳ</a>
                                     <?php endif; ?>
