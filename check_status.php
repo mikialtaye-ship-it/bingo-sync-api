@@ -1,8 +1,6 @@
  <?php
 ob_start();
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
-}
+session_start();
 
 $dbPath = '/var/www/html/ATDbingo.sqlite';
 
@@ -10,22 +8,17 @@ try {
     $db = new PDO('sqlite:' . $dbPath);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-    // የተጠቃሚዎች ላይሰንስ መቆጣጠሪያ ሰንጠረዥ
     $db->exec("CREATE TABLE IF NOT EXISTS user_licenses (
         username TEXT PRIMARY KEY,
         status TEXT DEFAULT 'ACTIVE',
         updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
 
-    // በሲስተሙ ውስጥ ያሉትን ነባር ተጠቃሚዎች በሙሉ ወደ ላይሰንስ ሰንጠረዥ በራስ-ሰር መሳብ
     $db->exec("INSERT OR IGNORE INTO user_licenses (username, status)
                SELECT DISTINCT username, 'ACTIVE' FROM transactions WHERE username != ''
                UNION
                SELECT DISTINCT alias_name, 'ACTIVE' FROM generated_licenses WHERE alias_name IS NOT NULL AND alias_name != ''");
-
-} catch (Exception $e) {
-    // ዳታቤዝ ስህተት
-}
+} catch (Exception $e) {}
 
 // 1. ዴስክቶፕ አፑ ኦንላይን ቼክ ሲያደርግ (API Check)
 if (isset($_GET['username']) || isset($_POST['username'])) {
@@ -51,9 +44,9 @@ if (isset($_GET['username']) || isset($_POST['username'])) {
     exit;
 }
 
-// 2. አድሚን በብሮውዘር ገብቶ ተጠቃሚዎችን ሲቆጣጠር
+// 2. አድሚን ገብቶ መቆጣጠር ሲፈልግ (ሴሽን ከሌለው ወደ ሎግኢን መላክ)
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
-    header("Location: index.php");
+    echo "<script>window.location.href='index.php';</script>";
     exit();
 }
 
@@ -101,8 +94,8 @@ $allUsers = $db->query("SELECT * FROM user_licenses ORDER BY username ASC")->fet
     <style>
         :root { --primary: #2563eb; --sidebar-bg: #0f172a; --sidebar-hover: #1e293b; --bg-main: #f8fafc; --card-bg: #ffffff; --border: #e2e8f0; --text-dark: #0f172a; --text-light: #64748b; }
         * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-[11/10/2026 6:29 PM] Adis dish: body { display: flex; min-height: 100vh; background-color: var(--bg-main); color: var(--text-dark); margin: 0; }
-        .sidebar { width: 250px; background-color: var(--sidebar-bg); color: #94a3b8; display: flex; flex-direction: column; padding: 20px; flex-shrink: 0; }
+        body { display: flex; min-height: 100vh; background-color: var(--bg-main); color: var(--text-dark); margin: 0; }
+[11/10/2026 6:34 PM] Adis dish: .sidebar { width: 250px; background-color: var(--sidebar-bg); color: #94a3b8; display: flex; flex-direction: column; padding: 20px; flex-shrink: 0; }
         .brand { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 30px; display: flex; align-items: center; gap: 10px; }
         .nav-link { color: #94a3b8; text-decoration: none; padding: 12px 14px; border-radius: 8px; margin-bottom: 6px; display: flex; align-items: center; gap: 12px; font-size: 14px; font-weight: 500; }
         .nav-link:hover, .nav-link.active { background-color: var(--sidebar-hover); color: #fff; }
@@ -152,10 +145,10 @@ $allUsers = $db->query("SELECT * FROM user_licenses ORDER BY username ASC")->fet
 
             <table>
                 <thead>
- <tr>
+                    <tr>
                         <th>ተጠቃሚ ስም (Username)</th>
                         <th>ሁኔታ (License Status)</th>
-                        <th>እርምጃ (Action)</th>
+ <th>እርምጃ (Action)</th>
                     </tr>
                 </thead>
                 <tbody>
