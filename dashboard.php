@@ -47,7 +47,7 @@ try {
         last_sync DATETIME DEFAULT CURRENT_TIMESTAMP
     )");
 
-    // ሱቅ ከዳሽቦርዱ ላይ በቀጥታ ማገድ ወይም መክፈት
+    // ከዳሽቦርዱ ላይ በቀጥታ ማገድ ወይም መክፈት
     if (isset($_GET['action']) && isset($_GET['shop_id'])) {
         $action = $_GET['action'];
         $sId = trim($_GET['shop_id']);
@@ -96,7 +96,7 @@ try {
         .sidebar { width: 250px; background-color: var(--sidebar-bg); color: #94a3b8; display: flex; flex-direction: column; padding: 20px; flex-shrink: 0; }
         .brand { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 30px; display: flex; align-items: center; gap: 10px; }
         .nav-link { color: #94a3b8; text-decoration: none; padding: 12px; border-radius: 8px; margin-bottom: 5px; display: flex; align-items: center; gap: 10px; font-size: 14px; }
- .nav-link.active, .nav-link:hover { background-color: #1e293b; color: #fff; }
+        .nav-link.active, .nav-link:hover { background-color: #1e293b; color: #fff; }
         .nav-link.active { background-color: var(--primary); }
         .nav-link.logout { margin-top: auto; color: #f87171; }
         .main { flex: 1; padding: 30px; overflow-y: auto; }
@@ -121,6 +121,7 @@ try {
     <div class="sidebar">
         <div class="brand"><i class="fa-solid fa-gamepad"></i> ATD Control</div>
         <a href="dashboard.php" class="nav-link active"><i class="fa-solid fa-chart-pie"></i> Dashboard</a>
+        <a href="generate_user.php" class="nav-link"><i class="fa-solid fa-user-plus"></i> New Center (User)</a>
         <a href="generate_balance.php" class="nav-link"><i class="fa-solid fa-paper-plane"></i> Transfer Balance</a>
         <a href="check_status.php" class="nav-link"><i class="fa-solid fa-shield-halved"></i> Checking Status</a>
         <a href="logout.php" class="nav-link logout"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
@@ -144,7 +145,7 @@ try {
             </div>
         </div>
 
-        <!-- የተገናኙ ሱቆች እና የላይሰንስ ቁጥጥር ሰንጠረዥ -->
+        <!-- የተገናኙ ሱቆች ሰንጠረዥ -->
         <div class="table-card">
             <div class="card-header"><i class="fa-solid fa-shield-halved" style="color: #2563eb;"></i> Shop License Status & Control</div>
             <table>
@@ -159,8 +160,8 @@ try {
                 </thead>
                 <tbody>
                     <?php if (empty($shops)): ?>
-                        <tr><td colspan="5" style="text-align: center; color: #94a3b8; padding: 24px;">ምንም የተገናኘ ሱቅ የለም። ዴስክቶፕ አፑ አንዴ ሲንክ ሲያደርግ በራሱ ይመዘገባል።</td></tr>
-[11/10/2026 6:16 PM] Adis dish: <?php else: ?>
+                        <tr><td colspan="5" style="text-align: center; color: #94a3b8; padding: 24px;">ምንም የተገናኘ ሱቅ የለም።</td></tr>
+                    <?php else: ?>
                         <?php foreach ($shops as $s): ?>
                             <tr>
                                 <td><strong><?= htmlspecialchars($s['shop_id']) ?></strong></td>
@@ -169,13 +170,13 @@ try {
                                     <?php if ($s['status'] === 'ACTIVE'): ?>
                                         <span class="badge badge-success">ACTIVE</span>
                                     <?php else: ?>
-                                        <span class="badge badge-danger">BLOCKED / CANCELED</span>
+                                        <span class="badge badge-danger">BLOCKED</span>
                                     <?php endif; ?>
                                 </td>
                                 <td><?= htmlspecialchars($s['last_sync']) ?></td>
                                 <td>
                                     <?php if ($s['status'] === 'ACTIVE'): ?>
-                                        <a href="dashboard.php?action=block&shop_id=<?= urlencode($s['shop_id']) ?>" class="btn-act btn-block" onclick="return confirm('ይህንን ሱቅ ማገድ ይፈልጋሉ? ደንበኛው ጋር ሲስተሙ ይዘጋል።')">Block (Cancel)</a>
+                                        <a href="dashboard.php?action=block&shop_id=<?= urlencode($s['shop_id']) ?>" class="btn-act btn-block" onclick="return confirm('ይህንን ሱቅ ማገድ ይፈልጋሉ?')">Block (Cancel)</a>
                                     <?php else: ?>
                                         <a href="dashboard.php?action=unblock&shop_id=<?= urlencode($s['shop_id']) ?>" class="btn-act btn-unblock">Unblock</a>
                                     <?php endif; ?>
@@ -187,7 +188,7 @@ try {
             </table>
         </div>
 
-        <!-- የቅርብ ጊዜ የገንዘብ ዝውውሮች -->
+        <!-- የቅርብ ጊዜ ዝውውሮች -->
         <div class="table-card">
             <div class="card-header"><i class="fa-solid fa-clock-rotate-left"></i> Recent Transfer Activities</div>
             <table>
