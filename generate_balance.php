@@ -68,14 +68,17 @@ if (isset($_GET['action']) && isset($_GET['shop_id'])) {
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $targetUser = trim($_POST['topup_username'] ?? 'adis');
+    $targetUser = trim($_POST['topup_username'] ?? '');
     $rawShopId = strtoupper(trim($_POST['shop_id'] ?? ''));
     $amount = isset($_POST['amount']) ? (float)$_POST['amount'] : 0.0;
     $admin = isset($_SESSION['username']) ? $_SESSION['username'] : 'root';
 
-    // 🚨 ግዴታ ማረጋገጫ፡ Shop ID ባዶ ከሆነ ባላንስ መላክ ክልክል ነው!
+    // 🚨 ግዴታ ማረጋገጫ፡ Shop ID፣ Username እና Amount ሶስቱም ግዴታ ናቸው!
     if (empty($rawShopId)) {
         $message = "❌ ስህተት፡ የሱቅ መለያ (Shop ID) ግዴታ ነው! ያለ Shop ID ባላንስ መላክ አይቻልም።";
+        $statusClass = "error";
+    } elseif (empty($targetUser)) {
+        $message = "❌ ስህተት፡ የተጠቃሚ ስም (Client Username) ግዴታ ነው! ያለ ዩዘርኔም ባላንስ መላክ አይቻልም።";
         $statusClass = "error";
     } elseif ($amount <= 0) {
         $message = "❌ ስህተት፡ ትክክለኛ የገንዘብ መጠን ያስገቡ!";
@@ -88,33 +91,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             $refId = 'TXN' . strtoupper(substr(md5(uniqid(strval(mt_rand()), true)), 0, 8));
 
-            // 1. ትራንስፈሩን በ Shop ID ግዴታ መመዝገብ
+            // 1. ትራንስፈሩን በ Shop ID እና Username ግዴታ መመዝገብ
             $stmt = $db->prepare("INSERT INTO transactions (reference_id, username, amount, shop_id, status) VALUES (:ref, :u, :amt, :s, 'PENDING')");
             $stmt->execute([
                 ':ref' => $refId,
-                ':u'   => $targetUser ?: $formattedShopId,
+                ':u'   => $targetUser,
                 ':amt' => $amount,
                 ':s'   => $formattedShopId
             ]);
 
-            // 2. ሱቁ በ shops ሰንጠረዥ ውስጥ ከሌለ በራሱ ACTIVE አድርጎ መመዝገብ (ለቁጥጥር እንዲመች)
-            $shopIns = $db->prepare("INSERT OR IGNORE INTO shops (shop_id, username, status, last_sync) VALUES (:s, :u, 'ACTIVE', CURRENT_TIMESTAMP)");
+            // 2. ሱቁ በ shops ሰንጠረዥ ውስጥ ከሌለ መመዝገብ፣ ካለ ደግሞ ዩዘርኔሙን ማዘመን
+            $shopIns = $db->prepare("INSERT INTO shops (shop_id, username, status, last_sync) 
+                                     VALUES (:s, :u, 'ACTIVE', CURRENT_TIMESTAMP)
+                                     ON CONFLICT(shop_id) DO UPDATE SET username = excluded.username, last_sync = CURRENT_TIMESTAMP");
             $shopIns->execute([
                 ':s' => $formattedShopId,
-                ':u' => $targetUser ?: $formattedShopId
+                ':u' => $targetUser
             ]);
 
             // 3. በ Activity Log ላይ መመዝገብ
-            $logDetails = "Ref: " . $refId . " | Shop: " . $formattedShopId . " (Mandatory Shop ID Transfer)";
+            $logDetails = "Ref: " . $refId . " | Shop: " . $formattedShopId . " | User: " . $targetUser . " (Mandatory Shop & User Transfer)";
             $log = $db->prepare("INSERT INTO generated_licenses (username, alias_name, mode, action_details, topup_amount, created_at) VALUES (:admin, :target, 'topup', :details, :amt, CURRENT_TIMESTAMP)");
             $log->execute([
                 ':admin'   => $admin,
-                ':target'  => $formattedShopId,
+                ':target'  => $formattedShopId . " (" . $targetUser . ")",
                 ':details' => $logDetails,
                 ':amt'     => $amount
             ]);
 
-            $message = "✅ ETB " . number_format($amount, 2) . " ለሱቅ [{$formattedShopId}] በተሳካ ሁኔታ ተላልፏል! (Ref: {$refId})";
+            $message = "✅ ETB " . number_format($amount, 2) . " ለሱቅ [{$formattedShopId}] (ተጠቃሚ፡ {$targetUser}) በተሳካ ሁኔታ ተላልፏል! (Ref: {$refId})";
             $statusClass = "success";
         } catch (Exception $e) {
             $message = "ስህተት፡ " . $e->getMessage();
@@ -203,10 +208,10 @@ try {
                 <label>የሱቅ መለያ (Shop ID - ግዴታ) <span class="req">*</span></label>
                 <input type="text" name="shop_id" placeholder="ምሳሌ፡ SHOP-C3113EDD" style="text-transform: uppercase; font-weight: 700; border-color: #2563eb;" required>
 
-                <label>የተጠቃሚ ስም (Client Username)</label>
-                <input type="text" name="topup_username" value="adis" placeholder="Username">
+                <label>የተጠቃሚ ስም (Client Username - ግዴታ) <span class="req">*</span></label>
+                <input type="text" name="topup_username" placeholder="ምሳሌ፡ adis" style="font-weight: 600; border-color: #2563eb;" required>
                 
-                <label>የገንዘብ መጠን (Amount in ETB) <span class="req">*</span></label>
+                <label>የገንዘብ መጠን (Amount in ETB - ግዴታ) <span class="req">*</span></label>
                 <input type="number" name="amount" value="500" step="0.01" min="1" placeholder="Amount in ETB" required>
                 
                 <button type="submit"><i class="fa-solid fa-paper-plane"></i> አስተላልፍ (Transfer)</button>
@@ -232,7 +237,7 @@ try {
                             <?php foreach ($shops as $row): ?>
                                 <tr>
                                     <td><strong><?= htmlspecialchars($row['shop_id']) ?></strong></td>
-                                    <td><?= htmlspecialchars($row['username']) ?></td>
+                                    <td><strong><?= htmlspecialchars($row['username']) ?></strong></td>
                                     <td>
                                         <?php if ($row['status'] === 'ACTIVE'): ?>
                                             <span class="badge badge-active">ACTIVE</span>
