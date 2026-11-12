@@ -7,6 +7,9 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
 }
 
 $dbPath = '/var/www/html/ATDbingo.sqlite';
+if (!file_exists($dbPath)) {
+    $dbPath = __DIR__ . '/ATDbingo.sqlite';
+}
 
 try {
     $db = new PDO('sqlite:' . $dbPath);
@@ -17,7 +20,7 @@ try {
         reference_id TEXT UNIQUE NOT NULL,
         username TEXT NOT NULL,
         amount REAL NOT NULL,
-        shop_id TEXT,
+        shop_id TEXT NOT NULL,
         status TEXT DEFAULT 'PENDING',
         created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
         claimed_at DATETIME
@@ -49,64 +52,81 @@ $statusClass = '';
 
 if (isset($_GET['action']) && isset($_GET['shop_id'])) {
     $action = $_GET['action'];
-    $sId = trim($_GET['shop_id']);
+    $sId = strtoupper(trim($_GET['shop_id']));
 
     if ($action === 'block') {
-        $stmt = $db->prepare("UPDATE shops SET status = 'BLOCKED' WHERE shop_id = :s");
+        $stmt = $db->prepare("UPDATE shops SET status = 'BLOCKED' WHERE UPPER(shop_id) = :s");
         $stmt->execute([':s' => $sId]);
-        $message = "ሱቅ {$sId} በተሳካ ሁኔታ ታግዷል (CANCELLED)!";
+        $message = "⛔ ሱቅ {$sId} በተሳካ ሁኔታ ታግዷል (CANCELLED)!";
         $statusClass = 'success';
     } elseif ($action === 'unblock') {
-        $stmt = $db->prepare("UPDATE shops SET status = 'ACTIVE' WHERE shop_id = :s");
+        $stmt = $db->prepare("UPDATE shops SET status = 'ACTIVE' WHERE UPPER(shop_id) = :s");
         $stmt->execute([':s' => $sId]);
-        $message = "ሱቅ {$sId} እገዳው ተነስቶለታል!";
+        $message = "✅ ሱቅ {$sId} እገዳው ተነስቶለታል!";
         $statusClass = 'success';
     }
 }
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $targetUser = trim($_POST['topup_username'] ?? '');
-    $shopId = trim($_POST['shop_id'] ?? '');
+    $targetUser = trim($_POST['topup_username'] ?? 'adis');
+    $rawShopId = strtoupper(trim($_POST['shop_id'] ?? ''));
     $amount = isset($_POST['amount']) ? (float)$_POST['amount'] : 0.0;
     $admin = isset($_SESSION['username']) ? $_SESSION['username'] : 'root';
 
-    if (!empty($targetUser) && $amount > 0) {
+    // 🚨 ግዴታ ማረጋገጫ፡ Shop ID ባዶ ከሆነ ባላንስ መላክ ክልክል ነው!
+    if (empty($rawShopId)) {
+        $message = "❌ ስህተት፡ የሱቅ መለያ (Shop ID) ግዴታ ነው! ያለ Shop ID ባላንስ መላክ አይቻልም።";
+        $statusClass = "error";
+    } elseif ($amount <= 0) {
+        $message = "❌ ስህተት፡ ትክክለኛ የገንዘብ መጠን ያስገቡ!";
+        $statusClass = "error";
+    } else {
+        // SHOP- ቅጥያ ከሌለው በራሱ እንዲጨምርለት (ለምሳሌ C3113EDD -> SHOP-C3113EDD)
+        $cleanCode = str_replace('SHOP-', '', $rawShopId);
+        $formattedShopId = 'SHOP-' . $cleanCode;
+
         try {
             $refId = 'TXN' . strtoupper(substr(md5(uniqid(strval(mt_rand()), true)), 0, 8));
 
+            // 1. ትራንስፈሩን በ Shop ID ግዴታ መመዝገብ
             $stmt = $db->prepare("INSERT INTO transactions (reference_id, username, amount, shop_id, status) VALUES (:ref, :u, :amt, :s, 'PENDING')");
             $stmt->execute([
                 ':ref' => $refId,
-                ':u'   => $targetUser,
+                ':u'   => $targetUser ?: $formattedShopId,
                 ':amt' => $amount,
-                ':s'   => (!empty($shopId) ? $shopId : null)
+                ':s'   => $formattedShopId
             ]);
 
-            $logDetails = "Ref: " . $refId . " | Shop: " . (!empty($shopId) ? $shopId : 'All') . " (Online Transfer)";
+            // 2. ሱቁ በ shops ሰንጠረዥ ውስጥ ከሌለ በራሱ ACTIVE አድርጎ መመዝገብ (ለቁጥጥር እንዲመች)
+            $shopIns = $db->prepare("INSERT OR IGNORE INTO shops (shop_id, username, status, last_sync) VALUES (:s, :u, 'ACTIVE', CURRENT_TIMESTAMP)");
+            $shopIns->execute([
+                ':s' => $formattedShopId,
+                ':u' => $targetUser ?: $formattedShopId
+            ]);
+
+            // 3. በ Activity Log ላይ መመዝገብ
+            $logDetails = "Ref: " . $refId . " | Shop: " . $formattedShopId . " (Mandatory Shop ID Transfer)";
             $log = $db->prepare("INSERT INTO generated_licenses (username, alias_name, mode, action_details, topup_amount, created_at) VALUES (:admin, :target, 'topup', :details, :amt, CURRENT_TIMESTAMP)");
             $log->execute([
                 ':admin'   => $admin,
-                ':target'  => $targetUser,
+                ':target'  => $formattedShopId,
                 ':details' => $logDetails,
                 ':amt'     => $amount
             ]);
 
-            $message = "✅ ETB " . number_format($amount, 2) . " ወደ ተጠቃሚ {$targetUser} ተላልፏል! (Ref: {$refId})";
+            $message = "✅ ETB " . number_format($amount, 2) . " ለሱቅ [{$formattedShopId}] በተሳካ ሁኔታ ተላልፏል! (Ref: {$refId})";
             $statusClass = "success";
         } catch (Exception $e) {
             $message = "ስህተት፡ " . $e->getMessage();
             $statusClass = "error";
         }
-    } else {
-        $message = "እባክዎ ትክክለኛ ተጠቃሚ እና የብር መጠን ያስገቡ!";
-        $statusClass = "error";
     }
 }
 
 $shops = [];
 try {
     $shopQuery = $db->query("SELECT shop_id, username, status, last_sync FROM shops ORDER BY last_sync DESC");
-if ($shopQuery) {
+    if ($shopQuery) {
         $shops = $shopQuery->fetchAll(PDO::FETCH_ASSOC);
     }
 } catch (Exception $e) {
@@ -145,11 +165,12 @@ if ($shopQuery) {
         .card { width: 100%; max-width: 580px; background: var(--card-bg); padding: 30px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05); }
         h2 { font-size: 19px; font-weight: 700; margin-bottom: 20px; text-align: center; }
         label { font-size: 12px; font-weight: 600; color: var(--text-light); display: block; margin-top: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+        label span.req { color: #ef4444; font-weight: 800; }
         input { width: 100%; padding: 11px 13px; margin-top: 6px; border: 1px solid var(--border); border-radius: 8px; font-size: 14px; outline: none; }
         input:focus { border-color: var(--primary); }
         button { width: 100%; padding: 13px; margin-top: 20px; background: var(--primary); color: #ffffff; border: none; border-radius: 8px; font-size: 15px; font-weight: 700; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; }
         button:hover { background: var(--primary-hover); }
-        .msg { padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; }
+        .msg { padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; font-weight: 600; }
         .msg.success { background: #dcfce7; color: #15803d; border: 1px solid #bbf7d0; }
         .msg.error { background: #fee2e2; color: #b91c1c; border: 1px solid #fecaca; }
         .table-responsive { width: 100%; overflow-x: auto; margin-top: 10px; }
@@ -160,7 +181,7 @@ if ($shopQuery) {
         .badge-active { background: #dcfce7; color: #15803d; }
         .badge-blocked { background: #fee2e2; color: #b91c1c; }
         .btn-act { padding: 5px 10px; border-radius: 6px; text-decoration: none; font-size: 11px; font-weight: 600; }
-: .btn-block { background: #ef4444; color: #ffffff; }
+        .btn-block { background: #ef4444; color: #ffffff; }
         .btn-unblock { background: #22c55e; color: #ffffff; }
     </style>
 </head>
@@ -179,13 +200,13 @@ if ($shopQuery) {
                 <div class="msg <?= $statusClass ?>"><?= htmlspecialchars($message) ?></div>
             <?php endif; ?>
             <form method="POST">
-                <label>የተጠቃሚ ስም (Client Username)</label>
-                <input type="text" name="topup_username" value="adis" placeholder="Username" required>
+                <label>የሱቅ መለያ (Shop ID - ግዴታ) <span class="req">*</span></label>
+                <input type="text" name="shop_id" placeholder="ምሳሌ፡ SHOP-C3113EDD" style="text-transform: uppercase; font-weight: 700; border-color: #2563eb;" required>
 
-                <label>የሱቅ መለያ (Shop ID) - አማራጭ</label>
-                <input type="text" name="shop_id" placeholder="ምሳሌ፡ SHOP-XXXXXXXX">
+                <label>የተጠቃሚ ስም (Client Username)</label>
+                <input type="text" name="topup_username" value="adis" placeholder="Username">
                 
-                <label>የገንዘብ መጠን (Amount)</label>
+                <label>የገንዘብ መጠን (Amount in ETB) <span class="req">*</span></label>
                 <input type="number" name="amount" value="500" step="0.01" min="1" placeholder="Amount in ETB" required>
                 
                 <button type="submit"><i class="fa-solid fa-paper-plane"></i> አስተላልፍ (Transfer)</button>
@@ -195,7 +216,7 @@ if ($shopQuery) {
         <div class="card">
             <h2><i class="fa-solid fa-store"></i> የተገናኙ ሱቆች እና ላይሰንስ ቁጥጥር</h2>
             <?php if (empty($shops)): ?>
-                <p style="color: #64748b; font-size: 13px; text-align: center; margin-top: 10px;">እስካሁን የተገናኘ ሱቅ የለም። ደንበኛው ከዴስክቶፕ አፑ አንዴ ሲንክ ሲያደርግ በራሱ እዚህ ይመዘገባል።</p>
+                <p style="color: #64748b; font-size: 13px; text-align: center; margin-top: 10px;">እስካሁን የተገናኘ ሱቅ የለም።</p>
             <?php else: ?>
                 <div class="table-responsive">
                     <table>
