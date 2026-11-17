@@ -1,4 +1,4 @@
- <?php
+<?php
 ob_start();
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -10,7 +10,7 @@ if (isset($_SESSION['user_id'])) {
 }
 
 // ከ Supabase ዳታቤዝ ጋር የሚያገናኘውን db.php መጥራት
-require_once DIR . '/db.php';
+require_once __DIR__ . '/db.php';
 $db = $pdo;
 
 try {
@@ -80,7 +80,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .brand-icon i { font-size: 26px; color: #ffffff; }
         h2 { color: var(--text-main); font-size: 24px; font-weight: 700; margin-bottom: 6px; }
         p.subtitle { color: var(--text-muted); font-size: 13px; margin-bottom: 28px; }
- .error-msg { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; text-align: left; }
+        .error-msg { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; text-align: left; }
         .input-group { position: relative; margin-bottom: 20px; text-align: left; }
         .input-group label { display: block; color: var(--text-muted); font-size: 12px; font-weight: 600; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
         .input-wrapper { position: relative; display: flex; align-items: center; }
