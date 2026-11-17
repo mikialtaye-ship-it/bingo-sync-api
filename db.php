@@ -3,7 +3,7 @@ $host = 'aws-0-eu-west-1.pooler.supabase.com';
 $port = '5432';
 $dbname = 'postgres';
 $user = 'postgres.zriwaxchecfffaiblchi';
-$password = 'Abcd1234';
+$password = 'AtdBingo2026#';
 
 try {
     $dsn = "pgsql:host=$host;port=$port;dbname=$dbname;sslmode=require";
