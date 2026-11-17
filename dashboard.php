@@ -1,4 +1,4 @@
-<?php
+[11/16/2026 10:32 PM] Adis dish: <?php
 session_start();
 
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
@@ -6,17 +6,17 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
     exit();
 }
 
-$dbPath = "/var/www/html/ATDbingo.sqlite";
+// ከ Supabase ዳታቤዝ ጋር የሚያገናኘውን db.php መጥራት
+require_once DIR . '/db.php';
+$db = $pdo;
+
 $message = '';
 $statusClass = '';
 
 try {
-    $db = new PDO('sqlite:' . $dbPath);
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
-    // 1. የተመዘገቡ ተጠቃሚዎችና ማዕከላት ሙሉ መረጃ ሰንጠረዥ
+    // 1. የተመዘገቡ ተጠቃሚዎችና ማዕከላት ሙሉ መረጃ ሰንጠረዥ (PostgreSQL Syntax)
     $db->exec("CREATE TABLE IF NOT EXISTS bingo_centers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         center_name TEXT NOT NULL,
         username TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
@@ -27,44 +27,45 @@ try {
         region TEXT,
         address TEXT,
         notes TEXT,
-        initial_balance REAL DEFAULT 0,
+        initial_balance NUMERIC(10, 2) DEFAULT 0,
         status TEXT DEFAULT 'ACTIVE',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
 
     $db->exec("CREATE TABLE IF NOT EXISTS transactions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         reference_id TEXT UNIQUE NOT NULL,
         username TEXT NOT NULL,
-        amount REAL NOT NULL,
+        amount NUMERIC(10, 2) NOT NULL,
         shop_id TEXT,
         status TEXT DEFAULT 'PENDING',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        claimed_at DATETIME
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        claimed_at TIMESTAMP
     )");
 
     $db->exec("CREATE TABLE IF NOT EXISTS generated_licenses (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         username TEXT NOT NULL,
         alias_name TEXT,
         mode TEXT NOT NULL,
         action_details TEXT NOT NULL,
         mac_address TEXT,
-        topup_amount REAL DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        topup_amount NUMERIC(10, 2) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
 
     $db->exec("CREATE TABLE IF NOT EXISTS shops (
         shop_id TEXT PRIMARY KEY,
         username TEXT NOT NULL,
         status TEXT DEFAULT 'ACTIVE',
-        last_sync DATETIME DEFAULT CURRENT_TIMESTAMP
+        last_sync TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
 
     $db->exec("CREATE TABLE IF NOT EXISTS user_licenses (
         username TEXT PRIMARY KEY,
+        mac_address TEXT,
         status TEXT DEFAULT 'ACTIVE',
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
 
     // 2. የድሮ ዝውውሮችን እና ታሪኮችን በሙሉ ማጽጃ (Reset Transfer History)
@@ -91,8 +92,8 @@ try {
         exit();
     }
 
-    // ስታትስቲክስ
-    $totalTransferred = (float)$db->query("SELECT SUM(amount) FROM transactions WHERE status = 'CLAIMED'")->fetchColumn();
+    // ስታትስቲክስ (PostgreSQL COALESCE በመጠቀም NULL ቢሆን 0 እንዲመልስ)
+    $totalTransferred = (float)$db->query("SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE status = 'CLAIMED'")->fetchColumn();
     $pendingCount = (int)$db->query("SELECT COUNT(*) FROM transactions WHERE status = 'PENDING'")->fetchColumn();
     $centersCount = (int)$db->query("SELECT COUNT(*) FROM bingo_centers")->fetchColumn();
 
@@ -109,7 +110,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ATD Control | Master Dashboard</title>
+[11/16/2026 10:32 PM] Adis dish: <title>ATD Control | Master Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -133,7 +134,7 @@ try {
         .nav-link.logout { margin-top: auto; color: #f87171; }
         
         .main { flex: 1; padding: 30px; overflow-y: auto; }
-        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: gap: 15px; }
+        .header-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 15px; }
         
         .metrics-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
         .metric-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 12px; padding: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
@@ -161,7 +162,7 @@ try {
         /* Modal Details */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 100; }
         .modal-box { background: white; border-radius: 12px; max-width: 500px; width: 90%; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-        .modal-box h3 { margin-bottom: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; font-size: 17px; }
+[11/16/2026 10:32 PM] Adis dish: .modal-box h3 { margin-bottom: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; font-size: 17px; }
         .detail-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
         .detail-row span:first-child { color: #64748b; font-weight: 600; }
         .close-btn { width: 100%; margin-top: 20px; background: #0f172a; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; }
@@ -231,13 +232,13 @@ try {
                             <?php foreach ($centers as $c): ?>
                                 <tr>
                                     <td><strong><?= htmlspecialchars($c['center_name']) ?></strong></td>
-                                    <td><code><?= htmlspecialchars($c['username']) ?></code></td>
+[11/16/2026 10:32 PM] Adis dish: <td><code><?= htmlspecialchars($c['username']) ?></code></td>
                                     <td><?= htmlspecialchars($c['phone'] ?: '-') ?></td>
                                     <td><?= htmlspecialchars($c['additional_contact'] ?: '-') ?></td>
                                     <td><?= htmlspecialchars(($c['region'] ? $c['region'] . ', ' : '') . ($c['address'] ?: '-')) ?></td>
                                     <td><small><?= htmlspecialchars($c['mac_address']) ?></small></td>
                                     <td>
-                                        <button class="btn-view" onclick='showDetails(<?= json_encode($c) ?>)'><i class="fa-solid fa-eye"></i> View</button>
+                                        <button class="btn-view" onclick='showDetails(<?= json_encode($c, JSON_HEX_APOS | JSON_HEX_QUOT) ?>)'><i class="fa-solid fa-eye"></i> View</button>
                                     </td>
                                 </tr>
                             <?php endforeach; ?>
@@ -298,7 +299,7 @@ try {
             <div class="detail-row"><span>Password:</span><span id="m_pass"></span></div>
             <div class="detail-row"><span>Owner Name:</span><span id="m_owner"></span></div>
             <div class="detail-row"><span>Phone Number:</span><span id="m_phone"></span></div>
-            <div class="detail-row"><span>Telegram / Alt Contact:</span><span id="m_alt"></span></div>
+[11/16/2026 10:32 PM] Adis dish: <div class="detail-row"><span>Telegram / Alt Contact:</span><span id="m_alt"></span></div>
             <div class="detail-row"><span>Region / City:</span><span id="m_region"></span></div>
             <div class="detail-row"><span>Address:</span><span id="m_address"></span></div>
             <div class="detail-row"><span>MAC Address:</span><span id="m_mac"></span></div>
