@@ -1,4 +1,4 @@
- <?php
+<?php
 // Fast, zero-DB response for cron-job.org Keep-Alive pings
 if (isset($_GET['ping'])) {
     http_response_code(200);
@@ -18,7 +18,7 @@ if (isset($_SESSION['user_id'])) {
 }
 
 // ከ Supabase ዳታቤዝ ጋር የሚያገናኘውን db.php መጥራት
-require_once DIR . '/db.php';
+require_once __DIR__ . '/db.php';
 $db = $pdo;
 
 try {
@@ -86,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .login-card { width: 100%; max-width: 400px; background: var(--card-bg); backdrop-filter: blur(16px); border: 1px solid var(--border-color); border-radius: 16px; padding: 40px 32px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3); text-align: center; }
         .brand-icon { width: 60px; height: 60px; border-radius: 14px; background: linear-gradient(135deg, var(--primary), #3b82f6); display: flex; justify-content: center; align-items: center; margin: 0 auto 16px; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35); }
         .brand-icon i { font-size: 26px; color: #ffffff; }
- h2 { color: var(--text-main); font-size: 24px; font-weight: 700; margin-bottom: 6px; }
+        h2 { color: var(--text-main); font-size: 24px; font-weight: 700; margin-bottom: 6px; }
         p.subtitle { color: var(--text-muted); font-size: 13px; margin-bottom: 28px; }
         .error-msg { background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.3); color: #f87171; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 20px; display: flex; align-items: center; gap: 8px; text-align: left; }
         .input-group { position: relative; margin-bottom: 20px; text-align: left; }
