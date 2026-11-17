@@ -3,15 +3,12 @@ header('Content-Type: application/json; charset=UTF-8');
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: POST, GET, OPTIONS");
 
-// dashboard.php እና generate_balance.php የሚጠቀሙት ትክክለኛው ዳታቤዝ
-$dbPath = "/var/www/html/ATDbingo.sqlite";
-if (!file_exists($dbPath)) {
-    $dbPath = __DIR__ . '/ATDbingo.sqlite';
-}
+// ከ Supabase ዳታቤዝ ጋር የሚያገናኘውን db.php መጥራት
+require_once __DIR__ . '/db.php';
 
 try {
-    $db = new PDO('sqlite:' . $dbPath);
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+    // db.php ውስጥ ያለው የግንኙነት ስም $pdo ስለሆነ እሱን ለ $db መስጠት
+    $db = $pdo;
 
     // 1. ተቀባዩ (Desktop App) ባላንሱን መቀበሉን ሲያረጋግጥ (POST Request)
     if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['reference_id'])) {
