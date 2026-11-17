@@ -1,4 +1,4 @@
-[11/16/2026 10:32 PM] Adis dish: <?php
+ <?php
 session_start();
 
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
@@ -110,7 +110,7 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-[11/16/2026 10:32 PM] Adis dish: <title>ATD Control | Master Dashboard</title>
+ <title>ATD Control | Master Dashboard</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -232,7 +232,7 @@ try {
                             <?php foreach ($centers as $c): ?>
                                 <tr>
                                     <td><strong><?= htmlspecialchars($c['center_name']) ?></strong></td>
-[11/16/2026 10:32 PM] Adis dish: <td><code><?= htmlspecialchars($c['username']) ?></code></td>
+ <td><code><?= htmlspecialchars($c['username']) ?></code></td>
                                     <td><?= htmlspecialchars($c['phone'] ?: '-') ?></td>
                                     <td><?= htmlspecialchars($c['additional_contact'] ?: '-') ?></td>
                                     <td><?= htmlspecialchars(($c['region'] ? $c['region'] . ', ' : '') . ($c['address'] ?: '-')) ?></td>
@@ -299,7 +299,7 @@ try {
             <div class="detail-row"><span>Password:</span><span id="m_pass"></span></div>
             <div class="detail-row"><span>Owner Name:</span><span id="m_owner"></span></div>
             <div class="detail-row"><span>Phone Number:</span><span id="m_phone"></span></div>
-[11/16/2026 10:32 PM] Adis dish: <div class="detail-row"><span>Telegram / Alt Contact:</span><span id="m_alt"></span></div>
+ <div class="detail-row"><span>Telegram / Alt Contact:</span><span id="m_alt"></span></div>
             <div class="detail-row"><span>Region / City:</span><span id="m_region"></span></div>
             <div class="detail-row"><span>Address:</span><span id="m_address"></span></div>
             <div class="detail-row"><span>MAC Address:</span><span id="m_mac"></span></div>
