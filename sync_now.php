@@ -7,12 +7,11 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
     exit;
 }
 
-$dbPath = __DIR__ . '/ATDbingo.sqlite';
+// ከ Supabase ዳታቤዝ ጋር የሚያገናኘውን db.php መጥራት
+require_once DIR . '/db.php';
+$db = $pdo;
 
 try {
-    $db = new PDO('sqlite:' . $dbPath);
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
     // POST Request መሆኑን ማረጋገጥ
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $username = trim($_POST['username'] ?? '');
@@ -30,7 +29,6 @@ try {
         $user = $checkUser->fetch(PDO::FETCH_ASSOC);
 
         if ($user) {
-            // last_updated ተወግዷል
             $update = $db->prepare("UPDATE users SET balance = balance + :amt WHERE username = :u");
             $update->execute([':amt' => $amount, ':u' => $username]);
         } else {
@@ -61,7 +59,7 @@ try {
     }
 
     // መደበኛ ቼክ (GET ከሆነ)
-    $stmt = $db->query("SELECT SUM(balance) FROM users");
+    $stmt = $db->query("SELECT COALESCE(SUM(balance), 0) FROM users");
     $total = (float)$stmt->fetchColumn();
     echo json_encode(['success' => true, 'balance' => $total, 'message' => 'System connected']);
 
