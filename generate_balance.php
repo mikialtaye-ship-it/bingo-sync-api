@@ -6,42 +6,39 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
     exit();
 }
 
-$dbPath = '/var/www/html/ATDbingo.sqlite';
-if (!file_exists($dbPath)) {
-    $dbPath = __DIR__ . '/ATDbingo.sqlite';
-}
+// ከ Supabase ዳታቤዝ ጋር የሚያገናኘውን db.php መጥራት
+require_once __DIR__ . '/db.php';
+$db = $pdo;
 
 try {
-    $db = new PDO('sqlite:' . $dbPath);
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
+    // PostgreSQL ሰንጠረዦችን መፍጠር (ከሌሉ)
     $db->exec("CREATE TABLE IF NOT EXISTS transactions (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         reference_id TEXT UNIQUE NOT NULL,
         username TEXT NOT NULL,
-        amount REAL NOT NULL,
+        amount NUMERIC(10, 2) NOT NULL,
         shop_id TEXT NOT NULL,
         status TEXT DEFAULT 'PENDING',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        claimed_at DATETIME
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        claimed_at TIMESTAMP
     )");
 
     $db->exec("CREATE TABLE IF NOT EXISTS shops (
         shop_id TEXT PRIMARY KEY,
         username TEXT NOT NULL,
         status TEXT DEFAULT 'ACTIVE',
-        last_sync DATETIME DEFAULT CURRENT_TIMESTAMP
+        last_sync TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
 
     $db->exec("CREATE TABLE IF NOT EXISTS generated_licenses (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         username TEXT NOT NULL,
         alias_name TEXT,
         mode TEXT NOT NULL,
         action_details TEXT NOT NULL,
         mac_address TEXT,
-        topup_amount REAL DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        topup_amount NUMERIC(10, 2) DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
 } catch (PDOException $e) {
     die("Database Connection Error: " . $e->getMessage());
@@ -100,10 +97,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 ':s'   => $formattedShopId
             ]);
 
-            // 2. ሱቁ በ shops ሰንጠረዥ ውስጥ ከሌለ መመዝገብ፣ ካለ ደግሞ ዩዘርኔሙን ማዘመን
+            // 2. ሱቁ በ shops ሰንጠረዥ ውስጥ ከሌለ መመዝገብ፣ ካለ ደግሞ ዩዘርኔሙን ማዘመን (PostgreSQL ON CONFLICT)
             $shopIns = $db->prepare("INSERT INTO shops (shop_id, username, status, last_sync) 
                                      VALUES (:s, :u, 'ACTIVE', CURRENT_TIMESTAMP)
-                                     ON CONFLICT(shop_id) DO UPDATE SET username = excluded.username, last_sync = CURRENT_TIMESTAMP");
+                                     ON CONFLICT (shop_id) DO UPDATE SET username = EXCLUDED.username, last_sync = CURRENT_TIMESTAMP");
             $shopIns->execute([
                 ':s' => $formattedShopId,
                 ':u' => $targetUser
