@@ -7,40 +7,38 @@ if (!isset($_SESSION['user_id'])) {
     exit;
 }
 
-$dbPath = '/var/www/html/ATDbingo.sqlite';
+// ከ Supabase ዳታቤዝ ጋር የሚያገናኘውን db.php መጥራት
+require_once __DIR__ . '/db.php';
+$db = $pdo;
 
 try {
-    $db = new PDO('sqlite:' . $dbPath);
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
+    // PostgreSQL ሰንጠረዦችን መፍጠር (ከሌሉ)
     $db->exec("CREATE TABLE IF NOT EXISTS bingo_centers (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         center_name TEXT NOT NULL,
         username TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
-        mac_address TEXT UNIQUE NOT NULL, -- አንድ ማክ አድሬስ አንድ ጊዜ ብቻ
+        mac_address TEXT UNIQUE NOT NULL,
         owner_name TEXT,
         phone TEXT,
         additional_contact TEXT,
         region TEXT,
         address TEXT,
         notes TEXT,
-        initial_balance REAL DEFAULT 0,
+        initial_balance NUMERIC(10, 2) DEFAULT 0,
         status TEXT DEFAULT 'ACTIVE',
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
 
     $db->exec("CREATE TABLE IF NOT EXISTS user_licenses (
         username TEXT PRIMARY KEY,
         mac_address TEXT,
         status TEXT DEFAULT 'ACTIVE',
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
 
-    // አምድ ካልነበረው መጨመር
-    try {
-        $db->exec("ALTER TABLE user_licenses ADD COLUMN mac_address TEXT");
-    } catch (Exception $e) {}
+    // አምድ ካልነበረው መጨመር (PostgreSQL Syntax)
+    $db->exec("ALTER TABLE user_licenses ADD COLUMN IF NOT EXISTS mac_address TEXT");
 
 } catch (PDOException $e) {
     die("Database Connection Error: " . $e->getMessage());
@@ -97,8 +95,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
                     ':bal'  => $initial_balance
                 ]);
 
-                // ካንሰል ማድረጊያው (Checking Status) ላይ ወዲያውኑ ACTIVE ሆኖ እንዲቀመጥ ማድረግ
-                $licStmt = $db->prepare("INSERT OR REPLACE INTO user_licenses (username, mac_address, status, updated_at) VALUES (:u, :mac, 'ACTIVE', CURRENT_TIMESTAMP)");
+                // ካንሰል ማድረጊያው (Checking Status) ላይ ወዲያውኑ ACTIVE ሆኖ እንዲቀመጥ ማድረግ (PostgreSQL ON CONFLICT)
+                $licStmt = $db->prepare("INSERT INTO user_licenses (username, mac_address, status, updated_at) 
+                                         VALUES (:u, :mac, 'ACTIVE', CURRENT_TIMESTAMP)
+                                         ON CONFLICT (username) DO UPDATE 
+                                         SET mac_address = EXCLUDED.mac_address, status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP");
                 $licStmt->execute([':u' => $username, ':mac' => $mac_address]);
 
                 // .enc ፋይል ማመንጨት
@@ -344,3 +345,4 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['action']) && $_POST['
 </script>
 </body>
 </html>
+a
