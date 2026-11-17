@@ -1,11 +1,13 @@
- <?php
-session_start();
+<?php
+ob_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
     header("Location: index.php");
     exit();
 }
-
 // ከ Supabase ዳታቤዝ ጋር የሚያገናኘውን db.php መጥራት
 require_once DIR . '/db.php';
 $db = $pdo;
