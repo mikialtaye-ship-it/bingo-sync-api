@@ -8,7 +8,7 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
 }
 
 // ከ Supabase ዳታቤዝ ጋር የሚያገናኘውን db.php መጥራት
-require_once DIR . '/db.php';
+require_once 'db.php';
 $db = $pdo;
 
 $message = '';
