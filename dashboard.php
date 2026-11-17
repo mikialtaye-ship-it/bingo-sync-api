@@ -1,4 +1,4 @@
-<?php
+ <?php
 ob_start();
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -8,6 +8,7 @@ if (!isset($_SESSION['user_id']) || !isset($_SESSION['username'])) {
     header("Location: index.php");
     exit();
 }
+
 // ከ Supabase ዳታቤዝ ጋር የሚያገናኘውን db.php መጥራት
 require_once DIR . '/db.php';
 $db = $pdo;
@@ -164,7 +165,7 @@ try {
         /* Modal Details */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); justify-content: center; align-items: center; z-index: 100; }
         .modal-box { background: white; border-radius: 12px; max-width: 500px; width: 90%; padding: 24px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); }
-[11/16/2026 10:32 PM] Adis dish: .modal-box h3 { margin-bottom: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; font-size: 17px; }
+ .modal-box h3 { margin-bottom: 15px; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; font-size: 17px; }
         .detail-row { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
         .detail-row span:first-child { color: #64748b; font-weight: 600; }
         .close-btn { width: 100%; margin-top: 20px; background: #0f172a; color: white; border: none; padding: 10px; border-radius: 6px; cursor: pointer; }
