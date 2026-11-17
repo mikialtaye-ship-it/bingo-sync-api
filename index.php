@@ -1,4 +1,4 @@
-<?php
+ <?php
 session_start();
 
 if (isset($_SESSION['user_id'])) {
@@ -6,25 +6,23 @@ if (isset($_SESSION['user_id'])) {
     exit;
 }
 
-$dbPath = __DIR__ . '/ATDbingo.sqlite';
+// ከ Supabase ዳታቤዝ ጋር የሚያገናኘውን db.php መጥራት
+require_once DIR . '/db.php';
+$db = $pdo;
 
 try {
-    $db = new PDO('sqlite:' . $dbPath);
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
+    // PostgreSQL ሰንጠረዥ መፍጠር (ከሌለ)
     $db->exec("CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         username TEXT UNIQUE,
         password TEXT,
         name TEXT,
-        balance REAL NOT NULL DEFAULT 0.00,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        balance NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
 
-    try {
-        $db->exec("ALTER TABLE users ADD COLUMN last_updated DATETIME DEFAULT CURRENT_TIMESTAMP");
-    } catch (PDOException $ignored) {
-    }
+    $db->exec("ALTER TABLE users ADD COLUMN IF NOT EXISTS last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
 
     $rootUser = $db->prepare("SELECT id, password FROM users WHERE username = 'root' LIMIT 1");
     $rootUser->execute();
@@ -122,8 +120,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             margin: 0 auto 16px;
             box-shadow: 0 4px 12px rgba(37, 99, 235, 0.35);
         }
-
-        .brand-icon i {
+ .brand-icon i {
             font-size: 26px;
             color: #ffffff;
         }
