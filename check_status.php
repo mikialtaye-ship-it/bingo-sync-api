@@ -4,22 +4,24 @@ if (session_status() === PHP_SESSION_NONE) {
     @session_start();
 }
 
-$dbPath = '/var/www/html/ATDbingo.sqlite';
+// ከ Supabase ዳታቤዝ ጋር የሚያገናኘውን db.php መጥራት
+require_once __DIR__ . '/db.php';
+$db = $pdo;
 
 try {
-    $db = new PDO('sqlite:' . $dbPath);
-    $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-
+    // 1. user_licenses ሰንጠረዥን በ PostgreSQL መፍጠር
     $db->exec("CREATE TABLE IF NOT EXISTS user_licenses (
         username TEXT PRIMARY KEY,
         mac_address TEXT,
         status TEXT DEFAULT 'ACTIVE',
-        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )");
 
-    // ከ bingo_centers የተመዘገቡ አዳዲስ ተጠቃሚዎችን በሙሉ በራስ-ሰር ወደዚህ መሳብ
-    $db->exec("INSERT OR IGNORE INTO user_licenses (username, mac_address, status, updated_at)
-               SELECT username, mac_address, 'ACTIVE', created_at FROM bingo_centers");
+    // 2. ከ bingo_centers የተመዘገቡ አዳዲስ ተጠቃሚዎችን በሙሉ በራስ-ሰር ወደዚህ መሳብ (PostgreSQL Syntax)
+    $db->exec("INSERT INTO user_licenses (username, mac_address, status, updated_at)
+               SELECT username, mac_address, 'ACTIVE', COALESCE(created_at, CURRENT_TIMESTAMP) 
+               FROM bingo_centers
+               ON CONFLICT (username) DO NOTHING");
 
 } catch (Exception $e) {}
 
@@ -50,11 +52,14 @@ if (isset($_GET['username']) || isset($_POST['username'])) {
 $message = '';
 $statusClass = '';
 
-// 2. ተጠቃሚን በእጅ መመዝገብ
+// 2. ተጠቃሚን በእጅ መመዝገብ (PostgreSQL ON CONFLICT በመጠቀም)
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_user'])) {
     $newUser = trim($_POST['new_username'] ?? '');
     if (!empty($newUser)) {
-        $addStmt = $db->prepare("INSERT OR REPLACE INTO user_licenses (username, status, updated_at) VALUES (:u, 'ACTIVE', CURRENT_TIMESTAMP)");
+        $addStmt = $db->prepare("INSERT INTO user_licenses (username, status, updated_at) 
+                                 VALUES (:u, 'ACTIVE', CURRENT_TIMESTAMP)
+                                 ON CONFLICT (username) DO UPDATE 
+                                 SET status = 'ACTIVE', updated_at = CURRENT_TIMESTAMP");
         $addStmt->execute([':u' => $newUser]);
         $message = "ተጠቃሚ {$newUser} ተመዝግቧል!";
         $statusClass = 'success';
